@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, increment, addDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, increment, addDoc, getCountFromServer } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "motion/react";
@@ -31,6 +31,7 @@ export default function SiswaRoom() {
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
+  const [roomRank, setRoomRank] = useState<number | null>(null);
   const [streak, setStreak] = useState(0);
   const [feedback, setFeedback] = useState<"correct" | "incorrect" | null>(null);
   const [isAnswering, setIsAnswering] = useState(false);
@@ -213,6 +214,16 @@ export default function SiswaRoom() {
       submittedAt: new Date()
     }, { merge: true });
 
+    // Calculate room rank
+    try {
+      const lbRef = collection(db, "rooms", room.id, "leaderboard");
+      const qRank = query(lbRef, where("score", ">", calculatedScore));
+      const rankSnapshot = await getCountFromServer(qRank);
+      setRoomRank(rankSnapshot.data().count + 1);
+    } catch (e) {
+      console.error("Error calculating room rank:", e);
+    }
+
     // Award XP, Diamonds and update inventory
     const userRef = doc(db, "users", userData.uid);
     await updateDoc(userRef, {
@@ -341,6 +352,13 @@ export default function SiswaRoom() {
                 <div className="text-7xl font-black text-brand-navy mb-2">{score}</div>
                 <div className="text-brand-orange font-black uppercase tracking-widest text-sm mb-4">Total XP Didapat</div>
                 
+                {roomRank && (
+                  <div className="mb-6 flex items-center justify-center gap-2 text-brand-navy/40 font-black text-[10px] uppercase tracking-widest">
+                    <Trophy className="w-4 h-4" />
+                    Peringkat #{roomRank} di Ruangan Ini
+                  </div>
+                )}
+
                 <div className="flex items-center justify-center gap-2 bg-sky-50 text-sky-600 px-6 py-3 rounded-2xl mx-auto w-fit border border-sky-100">
                   <Diamond className="w-5 h-5 fill-current" />
                   <span className="text-2xl font-black">+{10 + Math.floor(score / 10)}</span>

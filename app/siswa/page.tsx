@@ -25,12 +25,12 @@ export default function SiswaDashboard() {
     const fetchData = async () => {
       if (!userData?.uid) return;
       try {
-        // 1. Fetch Global Leaderboard (Top 10 Siswa who have played)
+        // 1. Fetch Global Leaderboard (Top 10 Siswa who have earned XP)
         const qLeaderboard = query(
           collection(db, "users"), 
           where("role", "==", "Siswa"),
-          where("quizzesPlayed", ">", 0),
-          orderBy("quizzesPlayed", "desc"), 
+          where("xp", ">", 0),
+          orderBy("xp", "desc"), 
           limit(10)
         );
         const snapshotLeaderboard = await getDocs(qLeaderboard);
