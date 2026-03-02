@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
-import { LogOut, Play, Trophy, Star, Zap, RefreshCcw, History, Users, Diamond, ShoppingBag } from "lucide-react";
+import { LogOut, Play, Trophy, Star, Zap, History, Users, Diamond, ShoppingBag } from "lucide-react";
 import { collection, query, orderBy, getDocs, doc, updateDoc, limit, getCountFromServer, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import StudentOnboardingModal from "@/components/StudentOnboardingModal";
@@ -16,7 +16,6 @@ export default function SiswaDashboard() {
   const router = useRouter();
   const [roomCode, setRoomCode] = useState("");
   const [rank, setRank] = useState<number | string>("-");
-  const [isResetting, setIsResetting] = useState(false);
   const [quizHistory, setQuizHistory] = useState<any[]>([]);
   const [globalLeaderboard, setGlobalLeaderboard] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<"join" | "history" | "leaderboard" | "shop">("join");
@@ -74,29 +73,6 @@ export default function SiswaDashboard() {
     e.preventDefault();
     if (roomCode.length === 6) {
       router.push(`/room/siswa/${roomCode}`);
-    }
-  };
-
-  const resetData = async () => {
-    if (!userData?.uid) return;
-    if (!confirm("Apakah Anda yakin ingin mereset semua data XP dan Kuis Anda? Tindakan ini tidak dapat dibatalkan.")) return;
-    
-    setIsResetting(true);
-    try {
-      const userRef = doc(db, "users", userData.uid);
-      await updateDoc(userRef, {
-        xp: 0,
-        quizzesPlayed: 0
-      });
-      // The AuthContext will pick up the changes automatically if it's listening, 
-      // but we might need to refresh or the context might already handle it via onSnapshot if we added it.
-      // Since our AuthContext uses getDoc on auth change, we might need a manual refresh or window reload
-      window.location.reload();
-    } catch (error) {
-      console.error("Error resetting data:", error);
-      alert("Gagal mereset data.");
-    } finally {
-      setIsResetting(false);
     }
   };
 
@@ -368,15 +344,6 @@ export default function SiswaDashboard() {
               </div>
             </div>
           )}
-          
-          <button 
-            onClick={resetData}
-            disabled={isResetting}
-            className="mt-8 flex items-center gap-2 text-brand-navy/20 hover:text-red-500 transition-colors font-black text-[10px] uppercase tracking-widest"
-          >
-            <RefreshCcw className={`w-4 h-4 ${isResetting ? 'animate-spin' : ''}`} />
-            Reset Data Saya
-          </button>
         </div>
       </div>
     </div>

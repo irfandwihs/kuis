@@ -170,6 +170,14 @@ export default function GuruDashboard() {
     
     try {
       setDeletingRoomId(null);
+      
+      // 1. Bersihkan sub-koleksi leaderboard di dalam ruangan
+      const leaderboardRef = collection(db, "rooms", roomId, "leaderboard");
+      const leaderboardSnap = await getDocs(leaderboardRef);
+      const deletePromises = leaderboardSnap.docs.map(d => deleteDoc(d.ref));
+      await Promise.all(deletePromises);
+
+      // 2. Hapus dokumen ruangan utama
       const roomRef = doc(db, "rooms", roomId);
       await deleteDoc(roomRef);
       setRooms(prev => prev.filter(r => r.id !== roomId));
