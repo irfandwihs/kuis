@@ -50,6 +50,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const userDocRef = doc(db, "users", currentUser.uid);
         const userDoc = await getDoc(userDocRef);
         
+<<<<<<< HEAD
+        if (userDoc.exists()) {
+          const data = userDoc.data() as UserData;
+          setUserData(data);
+          
+          if (!data.role && pathname !== "/onboarding") {
+            router.push("/onboarding");
+          } else if (data.role) {
+            const isSiswaRoute = pathname.startsWith("/siswa") || pathname.startsWith("/room/siswa");
+            const isGuruRoute = pathname.startsWith("/guru") || pathname.startsWith("/room/guru");
+
+            if (data.role === "Guru" && isSiswaRoute) {
+              router.push("/guru");
+            } else if (data.role === "Siswa" && isGuruRoute) {
+              router.push("/siswa");
+            } else if (pathname === "/" || pathname === "/onboarding") {
+              router.push(data.role === "Guru" ? "/guru" : "/siswa");
+=======
+<<<<<<< HEAD
+        // Check if student has already submitted for this room
+        if (userData?.uid && roomData.id) {
+          const lbDoc = await getDoc(doc(db, "rooms", roomData.id, "leaderboard", userData.uid));
+          if (lbDoc.exists()) {
+            const lbData = lbDoc.data();
+            if (lbData.status === "finished") {
+              setScore(lbData.score || 0);
+              setSubmitted(true);
+>>>>>>> 668cb49 (2 Maret 2026)
+            }
+=======
         if (userDoc.exists()) {
           const data = userDoc.data() as UserData;
           setUserData(data);
@@ -67,6 +97,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             } else if (pathname === "/" || pathname === "/onboarding") {
               router.push(data.role === "Guru" ? "/guru" : "/siswa");
             }
+          }
+        } else {
+          // New user, create empty doc
+          const newUserData: UserData = {
+            uid: currentUser.uid,
+            email: currentUser.email,
+            displayName: currentUser.displayName,
+            role: null,
+            xp: 0,
+            diamonds: 0,
+            quizzesPlayed: 0,
+            inventory: {}
+          };
+          await setDoc(userDocRef, newUserData);
+          setUserData(newUserData);
+          if (pathname !== "/onboarding") {
+            router.push("/onboarding");
+>>>>>>> 4ea24c8 (2 Maret 2026)
           }
         } else {
           // New user, create empty doc

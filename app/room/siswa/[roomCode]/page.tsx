@@ -470,10 +470,23 @@ export default function SiswaRoom() {
   };
 
   const duckPaths = [
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+    { x: ["5%", "60%", "15%", "70%", "5%"], y: ["10%", "50%", "75%", "20%", "10%"] },
+    { x: ["70%", "10%", "65%", "5%", "70%"], y: ["20%", "70%", "15%", "60%", "20%"] },
+    { x: ["30%", "75%", "5%", "50%", "30%"], y: ["60%", "10%", "50%", "80%", "60%"] },
+    { x: ["60%", "5%", "75%", "20%", "60%"], y: ["75%", "30%", "80%", "10%", "75%"] },
+=======
+>>>>>>> 668cb49 (2 Maret 2026)
     { x: ["5%", "50%", "10%", "55%", "5%"], y: ["10%", "40%", "15%", "45%", "10%"] },
     { x: ["55%", "5%", "50%", "10%", "55%"], y: ["45%", "10%", "40%", "15%", "45%"] },
     { x: ["10%", "55%", "5%", "50%", "10%"], y: ["40%", "15%", "45%", "10%", "40%"] },
     { x: ["50%", "10%", "55%", "5%", "50%"], y: ["15%", "45%", "10%", "40%", "15%"] },
+<<<<<<< HEAD
+=======
+>>>>>>> 4ea24c8 (2 Maret 2026)
+>>>>>>> 668cb49 (2 Maret 2026)
   ];
 
   return (
@@ -545,6 +558,26 @@ export default function SiswaRoom() {
           </h2>
 
           {quiz?.quizType === "duck_hunt" ? (
+<<<<<<< HEAD
+            <div className="relative w-full h-[400px] md:h-[500px] bg-[#5c94fc] rounded-3xl overflow-hidden border-8 border-black shadow-inner" style={{ imageRendering: 'pixelated' }}>
+              {/* Pixel Clouds */}
+              <div className="absolute top-12 left-12 w-16 h-8 bg-white" style={{ boxShadow: '8px 8px 0 0 white, 16px 0 0 0 white, -8px 8px 0 0 white' }} />
+              <div className="absolute top-24 right-24 w-16 h-8 bg-white" style={{ boxShadow: '8px 8px 0 0 white, 16px 0 0 0 white, -8px 8px 0 0 white' }} />
+              
+              {/* Ground / Bushes */}
+              <div className="absolute bottom-0 left-0 w-full h-20 bg-[#8bdc00] border-t-8 border-[#00a800] z-20 flex items-end">
+                 <div className="w-full h-6 bg-[#00a800] opacity-50 mb-2" style={{ clipPath: 'polygon(0 100%, 5% 0, 10% 100%, 15% 0, 20% 100%, 25% 0, 30% 100%, 35% 0, 40% 100%, 45% 0, 50% 100%, 55% 0, 60% 100%, 65% 0, 70% 100%, 75% 0, 80% 100%, 85% 0, 90% 100%, 95% 0, 100% 100%)' }}></div>
+              </div>
+=======
+<<<<<<< HEAD
+            <div className="relative w-full h-[350px] md:h-[450px] bg-sky-200 rounded-3xl overflow-hidden border-4 border-sky-300 shadow-inner">
+              {/* Decorative Clouds */}
+              <div className="absolute top-10 left-10 w-20 h-8 bg-white/60 rounded-full blur-sm" />
+              <div className="absolute top-20 right-20 w-32 h-10 bg-white/50 rounded-full blur-sm" />
+              <div className="absolute bottom-1/3 left-1/4 w-24 h-8 bg-white/40 rounded-full blur-sm" />
+>>>>>>> 668cb49 (2 Maret 2026)
+              
+=======
             <div className="relative w-full h-[400px] md:h-[500px] bg-[#5c94fc] rounded-3xl overflow-hidden border-8 border-black shadow-inner" style={{ imageRendering: 'pixelated' }}>
               {/* Pixel Clouds */}
               <div className="absolute top-12 left-12 w-16 h-8 bg-white" style={{ boxShadow: '8px 8px 0 0 white, 16px 0 0 0 white, -8px 8px 0 0 white' }} />
@@ -555,6 +588,7 @@ export default function SiswaRoom() {
                  <div className="w-full h-6 bg-[#00a800] opacity-50 mb-2" style={{ clipPath: 'polygon(0 100%, 5% 0, 10% 100%, 15% 0, 20% 100%, 25% 0, 30% 100%, 35% 0, 40% 100%, 45% 0, 50% 100%, 55% 0, 60% 100%, 65% 0, 70% 100%, 75% 0, 80% 100%, 85% 0, 90% 100%, 95% 0, 100% 100%)' }}></div>
               </div>
               
+>>>>>>> 4ea24c8 (2 Maret 2026)
               {currentQ.options.map((opt: string, idx: number) => {
                 const isSelected = answers[currentQuestionIdx] === idx;
                 const isCorrect = idx === currentQ.correctAnswerIndex;
@@ -564,11 +598,20 @@ export default function SiswaRoom() {
 
                 const path = duckPaths[idx % 4];
                 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+>>>>>>> 668cb49 (2 Maret 2026)
                 let btnClass = "bg-white text-black border-4 border-black";
                 if (feedback && isCorrect) btnClass = "bg-[#4ade80] text-black border-4 border-black";
                 else if (feedback && isSelected && !isCorrect) btnClass = "bg-[#f87171] text-black border-4 border-black";
                 else if (isSelected) btnClass = "bg-[#facc15] text-black border-4 border-black";
 
+<<<<<<< HEAD
+=======
+>>>>>>> 4ea24c8 (2 Maret 2026)
+>>>>>>> 668cb49 (2 Maret 2026)
                 return (
                   <motion.button
                     key={idx}
@@ -583,9 +626,27 @@ export default function SiswaRoom() {
                       repeat: Infinity,
                       ease: "linear",
                     }}
+<<<<<<< HEAD
                     className={`absolute flex flex-col items-center justify-center gap-2 active:scale-95 transition-colors z-10`}
                     style={{ width: '140px' }}
                   >
+=======
+<<<<<<< HEAD
+                    className={`absolute p-3 md:p-4 rounded-2xl shadow-xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-colors z-10 ${
+                      feedback && isCorrect ? "bg-emerald-500 text-white border-2 border-emerald-600" :
+                      feedback && isSelected && !isCorrect ? "bg-red-500 text-white border-2 border-red-600" :
+                      isSelected ? "bg-brand-orange text-white border-2 border-brand-orange" :
+                      "bg-white text-brand-navy border-2 border-brand-navy/10 hover:border-brand-orange hover:bg-brand-orange/5"
+                    }`}
+                    style={{ width: '130px', height: '110px' }}
+                  >
+                    <Bird className={`w-8 h-8 md:w-10 md:h-10 ${feedback && isCorrect ? "text-white" : "text-brand-orange"} ${!feedback ? "animate-bounce" : ""}`} />
+                    <span className="text-[10px] md:text-xs font-black text-center line-clamp-3 leading-tight">{opt}</span>
+=======
+                    className={`absolute flex flex-col items-center justify-center gap-2 active:scale-95 transition-colors z-10`}
+                    style={{ width: '140px' }}
+                  >
+>>>>>>> 668cb49 (2 Maret 2026)
                     {/* Pixel Duck SVG */}
                     <svg width="64" height="64" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ transform: idx % 2 === 0 ? 'scaleX(-1)' : 'none', filter: 'drop-shadow(4px 4px 0px rgba(0,0,0,0.3))' }}>
                       <path d="M24 10h6v4h-6z" fill="#FC9838"/>
@@ -601,6 +662,10 @@ export default function SiswaRoom() {
                     <div className={`w-full p-2 font-mono text-[10px] md:text-xs font-black uppercase leading-tight ${btnClass}`} style={{ boxShadow: '4px 4px 0px rgba(0,0,0,0.5)' }}>
                       {opt}
                     </div>
+<<<<<<< HEAD
+=======
+>>>>>>> 4ea24c8 (2 Maret 2026)
+>>>>>>> 668cb49 (2 Maret 2026)
                   </motion.button>
                 );
               })}
