@@ -32,6 +32,7 @@ export default function GuruDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [topic, setTopic] = useState("");
   const [numQuestions, setNumQuestions] = useState(5);
+  const [quizType, setQuizType] = useState<"multiple_choice" | "true_false" | "duck_hunt">("multiple_choice");
   const [viewingQuiz, setViewingQuiz] = useState<Quiz | null>(null);
   const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
   const [deletingQuizId, setDeletingQuizId] = useState<string | null>(null);
@@ -82,7 +83,18 @@ export default function GuruDashboard() {
     
     try {
       const ai = new GoogleGenAI({ apiKey });
-      const prompt = `Buatlah kuis pilihan ganda tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${numQuestions} pertanyaan.`;
+      
+      let prompt = "";
+      let optionsDescription = "";
+      
+      if (quizType === "true_false") {
+        prompt = `Buatlah kuis Benar/Salah tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${numQuestions} pernyataan. Untuk setiap pertanyaan, berikan sebuah pernyataan. Pilihan jawaban (options) HARUS selalu ["Benar", "Salah"]. correctAnswerIndex adalah 0 jika pernyataan itu benar, dan 1 jika pernyataan itu salah.`;
+        optionsDescription = 'Exactly 2 options: ["Benar", "Salah"]';
+      } else {
+        // Both multiple_choice and duck_hunt use 4 options
+        prompt = `Buatlah kuis pilihan ganda tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${numQuestions} pertanyaan. Berikan 4 pilihan jawaban untuk setiap pertanyaan.`;
+        optionsDescription = "Exactly 4 options";
+      }
       
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
@@ -102,9 +114,9 @@ export default function GuruDashboard() {
                     options: {
                       type: Type.ARRAY,
                       items: { type: Type.STRING },
-                      description: "Exactly 4 options"
+                      description: optionsDescription
                     },
-                    correctAnswerIndex: { type: Type.INTEGER, description: "Index of the correct option (0-3)" }
+                    correctAnswerIndex: { type: Type.INTEGER, description: "Index of the correct option" }
                   },
                   required: ["question", "options", "correctAnswerIndex"]
                 }
@@ -122,6 +134,7 @@ export default function GuruDashboard() {
           guruId: userData.uid,
           subject: userData.subject,
           title: generatedData.title,
+          quizType: quizType, // Save the mode
           questions: generatedData.questions,
           createdAt: new Date()
         });
@@ -230,7 +243,7 @@ export default function GuruDashboard() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">Topik Pembelajaran</label>
                   <input 
@@ -251,6 +264,18 @@ export default function GuruDashboard() {
                     onChange={(e) => setNumQuestions(parseInt(e.target.value))}
                     className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none transition-all font-bold text-brand-navy text-sm"
                   />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">Mode Permainan</label>
+                  <select 
+                    value={quizType}
+                    onChange={(e) => setQuizType(e.target.value as "multiple_choice" | "true_false" | "duck_hunt")}
+                    className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none transition-all font-bold text-brand-navy text-sm cursor-pointer appearance-none"
+                  >
+                    <option value="multiple_choice">Pilihan Ganda (Classic)</option>
+                    <option value="true_false">Benar / Salah (Buzzer)</option>
+                    <option value="duck_hunt">Berburu Bebek (Duck Hunt)</option>
+                  </select>
                 </div>
               </div>
               

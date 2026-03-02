@@ -53,10 +53,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (userDoc.exists()) {
           const data = userDoc.data() as UserData;
           setUserData(data);
+          
           if (!data.role && pathname !== "/onboarding") {
             router.push("/onboarding");
-          } else if (data.role && (pathname === "/" || pathname === "/onboarding")) {
-            router.push(data.role === "Guru" ? "/guru" : "/siswa");
+          } else if (data.role) {
+            const isSiswaRoute = pathname.startsWith("/siswa") || pathname.startsWith("/room/siswa");
+            const isGuruRoute = pathname.startsWith("/guru") || pathname.startsWith("/room/guru");
+
+            if (data.role === "Guru" && isSiswaRoute) {
+              router.push("/guru");
+            } else if (data.role === "Siswa" && isGuruRoute) {
+              router.push("/siswa");
+            } else if (pathname === "/" || pathname === "/onboarding") {
+              router.push(data.role === "Guru" ? "/guru" : "/siswa");
+            }
           }
         } else {
           // New user, create empty doc

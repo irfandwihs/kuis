@@ -6,7 +6,7 @@ import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, i
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "motion/react";
-import { Gamepad2, Square, Trophy, Zap, Flame, Diamond, Sparkles, Ghost } from "lucide-react";
+import { Gamepad2, Square, Trophy, Zap, Flame, Diamond, Sparkles, Ghost, Bird } from "lucide-react";
 import confetti from "canvas-confetti";
 
 // Utility to shuffle array
@@ -469,6 +469,13 @@ export default function SiswaRoom() {
     transition: { duration: 0.4 }
   };
 
+  const duckPaths = [
+    { x: ["5%", "50%", "10%", "55%", "5%"], y: ["10%", "40%", "15%", "45%", "10%"] },
+    { x: ["55%", "5%", "50%", "10%", "55%"], y: ["45%", "10%", "40%", "15%", "45%"] },
+    { x: ["10%", "55%", "5%", "50%", "10%"], y: ["40%", "15%", "45%", "10%", "40%"] },
+    { x: ["50%", "10%", "55%", "5%", "50%"], y: ["15%", "45%", "10%", "40%", "15%"] },
+  ];
+
   return (
     <div className="min-h-screen bg-brand-cream flex flex-col items-center overflow-hidden">
       <div className="w-full max-w-md md:max-w-2xl px-4 py-6 md:py-10">
@@ -484,7 +491,7 @@ export default function SiswaRoom() {
               <button
                 key={itemId}
                 onClick={() => handleUseItem(itemId)}
-                disabled={count <= 0 || (itemId === "phoenix_feather") || isActive || feedback !== null}
+                disabled={count <= 0 || (itemId === "phoenix_feather") || isActive || feedback !== null || (itemId === "clear_answers" && quiz?.quizType === "true_false")}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all border-2 ${
                   isActive 
                     ? "bg-brand-orange text-white border-brand-orange shadow-lg" 
@@ -533,50 +540,136 @@ export default function SiswaRoom() {
             "border-transparent"
           }`}
         >
-          <h2 className="text-xl md:text-3xl font-black text-brand-navy mb-8 md:mb-10 leading-tight tracking-tight">
+          <h2 className="text-xl md:text-3xl font-black text-brand-navy mb-8 md:mb-10 leading-tight tracking-tight text-center">
             {currentQ.question}
           </h2>
 
-          <div className="grid grid-cols-1 gap-3 md:gap-4">
-            {currentQ.options.map((opt: string, idx: number) => {
-              const isSelected = answers[currentQuestionIdx] === idx;
-              const isCorrect = idx === currentQ.correctAnswerIndex;
+          {quiz?.quizType === "duck_hunt" ? (
+            <div className="relative w-full h-[400px] md:h-[500px] bg-[#5c94fc] rounded-3xl overflow-hidden border-8 border-black shadow-inner" style={{ imageRendering: 'pixelated' }}>
+              {/* Pixel Clouds */}
+              <div className="absolute top-12 left-12 w-16 h-8 bg-white" style={{ boxShadow: '8px 8px 0 0 white, 16px 0 0 0 white, -8px 8px 0 0 white' }} />
+              <div className="absolute top-24 right-24 w-16 h-8 bg-white" style={{ boxShadow: '8px 8px 0 0 white, 16px 0 0 0 white, -8px 8px 0 0 white' }} />
               
-              let buttonClass = "border-brand-navy/5 hover:border-brand-orange/30 hover:bg-brand-cream text-brand-navy/70";
-              const isRemoved = removedOptions.includes(idx);
+              {/* Ground / Bushes */}
+              <div className="absolute bottom-0 left-0 w-full h-20 bg-[#8bdc00] border-t-8 border-[#00a800] z-20 flex items-end">
+                 <div className="w-full h-6 bg-[#00a800] opacity-50 mb-2" style={{ clipPath: 'polygon(0 100%, 5% 0, 10% 100%, 15% 0, 20% 100%, 25% 0, 30% 100%, 35% 0, 40% 100%, 45% 0, 50% 100%, 55% 0, 60% 100%, 65% 0, 70% 100%, 75% 0, 80% 100%, 85% 0, 90% 100%, 95% 0, 100% 100%)' }}></div>
+              </div>
+              
+              {currentQ.options.map((opt: string, idx: number) => {
+                const isSelected = answers[currentQuestionIdx] === idx;
+                const isCorrect = idx === currentQ.correctAnswerIndex;
+                const isRemoved = removedOptions.includes(idx);
 
-              if (isRemoved) {
-                buttonClass = "opacity-20 grayscale pointer-events-none border-transparent";
-              } else if (feedback && isCorrect) {
-                buttonClass = "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-lg shadow-emerald-500/10";
-              } else if (feedback && isSelected && !isCorrect) {
-                buttonClass = "border-red-500 bg-red-50 text-red-700 shadow-lg shadow-red-500/10";
-              } else if (isSelected) {
-                buttonClass = "border-brand-orange bg-brand-orange/5 text-brand-orange shadow-lg shadow-brand-orange/10";
-              }
+                if (isRemoved) return null; // Duck flies away or disappears
 
-              return (
-                <button
-                  key={idx}
-                  disabled={isAnswering || feedback !== null || isRemoved}
-                  onClick={() => handleAnswer(idx)}
-                  className={`p-5 md:p-6 rounded-2xl text-left font-bold text-base md:text-lg transition-all border-2 active:scale-95 ${buttonClass}`}
-                >
-                  <div className="flex items-center gap-4 md:gap-6">
-                    <span className={`w-8 h-8 md:w-10 md:h-10 flex-shrink-0 rounded-xl flex items-center justify-center text-xs md:text-sm font-black transition-colors ${
-                      isSelected ? "bg-brand-orange text-white" : 
-                      feedback && isCorrect ? "bg-emerald-500 text-white" :
-                      isRemoved ? "bg-transparent" :
-                      "bg-brand-navy/5 text-brand-navy/40"
-                    }`}>
-                      {isRemoved ? <Ghost className="w-4 h-4 opacity-20" /> : String.fromCharCode(65 + idx)}
-                    </span>
-                    <span className="line-clamp-2">{isRemoved ? "???" : opt}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                const path = duckPaths[idx % 4];
+                
+                let btnClass = "bg-white text-black border-4 border-black";
+                if (feedback && isCorrect) btnClass = "bg-[#4ade80] text-black border-4 border-black";
+                else if (feedback && isSelected && !isCorrect) btnClass = "bg-[#f87171] text-black border-4 border-black";
+                else if (isSelected) btnClass = "bg-[#facc15] text-black border-4 border-black";
+
+                return (
+                  <motion.button
+                    key={idx}
+                    disabled={isAnswering || feedback !== null}
+                    onClick={() => handleAnswer(idx)}
+                    animate={{
+                      left: path.x,
+                      top: path.y,
+                    }}
+                    transition={{
+                      duration: 15 + (idx % 2) * 5,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
+                    className={`absolute flex flex-col items-center justify-center gap-2 active:scale-95 transition-colors z-10`}
+                    style={{ width: '140px' }}
+                  >
+                    {/* Pixel Duck SVG */}
+                    <svg width="64" height="64" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ transform: idx % 2 === 0 ? 'scaleX(-1)' : 'none', filter: 'drop-shadow(4px 4px 0px rgba(0,0,0,0.3))' }}>
+                      <path d="M24 10h6v4h-6z" fill="#FC9838"/>
+                      <path d="M14 6h10v8H14z" fill="#00A800"/>
+                      <path d="M20 8h2v2h-2z" fill="#000"/>
+                      <path d="M12 14h8v4h-8z" fill="#FFF"/>
+                      <path d="M6 16h14v10H6z" fill="#000"/>
+                      <path d="M8 18h8v6H8z" fill="#FFF"/>
+                      <path d="M2 18h4v4H2z" fill="#000"/>
+                    </svg>
+                    
+                    {/* The Box */}
+                    <div className={`w-full p-2 font-mono text-[10px] md:text-xs font-black uppercase leading-tight ${btnClass}`} style={{ boxShadow: '4px 4px 0px rgba(0,0,0,0.5)' }}>
+                      {opt}
+                    </div>
+                  </motion.button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className={`grid gap-3 md:gap-4 ${quiz?.quizType === "true_false" ? "grid-cols-2" : "grid-cols-1"}`}>
+              {currentQ.options.map((opt: string, idx: number) => {
+                const isSelected = answers[currentQuestionIdx] === idx;
+                const isCorrect = idx === currentQ.correctAnswerIndex;
+                
+                let buttonClass = "border-brand-navy/5 hover:border-brand-orange/30 hover:bg-brand-cream text-brand-navy/70";
+                const isRemoved = removedOptions.includes(idx);
+
+                if (isRemoved) {
+                  buttonClass = "opacity-20 grayscale pointer-events-none border-transparent";
+                } else if (feedback && isCorrect) {
+                  buttonClass = "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-lg shadow-emerald-500/10";
+                } else if (feedback && isSelected && !isCorrect) {
+                  buttonClass = "border-red-500 bg-red-50 text-red-700 shadow-lg shadow-red-500/10";
+                } else if (isSelected) {
+                  buttonClass = "border-brand-orange bg-brand-orange/5 text-brand-orange shadow-lg shadow-brand-orange/10";
+                }
+
+                if (quiz?.quizType === "true_false") {
+                  // Buzzer style for True/False
+                  const isBenar = opt.toLowerCase() === "benar";
+                  const baseColor = isBenar ? "emerald" : "red";
+                  
+                  let tfClass = `border-${baseColor}-500 text-${baseColor}-600 hover:bg-${baseColor}-50 hover:shadow-${baseColor}-500/20`;
+                  if (feedback && isCorrect) tfClass = `bg-${baseColor}-500 text-white border-${baseColor}-600 shadow-xl shadow-${baseColor}-500/30`;
+                  else if (feedback && isSelected && !isCorrect) tfClass = `bg-slate-200 text-slate-400 border-slate-300`;
+                  else if (isSelected) tfClass = `bg-${baseColor}-100 border-${baseColor}-500 text-${baseColor}-700 shadow-inner`;
+                  else if (feedback) tfClass = `opacity-50 grayscale`;
+
+                  return (
+                    <button
+                      key={idx}
+                      disabled={isAnswering || feedback !== null}
+                      onClick={() => handleAnswer(idx)}
+                      className={`p-8 md:p-12 rounded-[32px] text-center font-black text-2xl md:text-4xl transition-all border-4 active:scale-95 uppercase tracking-widest shadow-lg ${tfClass}`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                }
+
+                return (
+                  <button
+                    key={idx}
+                    disabled={isAnswering || feedback !== null || isRemoved}
+                    onClick={() => handleAnswer(idx)}
+                    className={`p-5 md:p-6 rounded-2xl text-left font-bold text-base md:text-lg transition-all border-2 active:scale-95 ${buttonClass}`}
+                  >
+                    <div className="flex items-center gap-4 md:gap-6">
+                      <span className={`w-8 h-8 md:w-10 md:h-10 flex-shrink-0 rounded-xl flex items-center justify-center text-xs md:text-sm font-black transition-colors ${
+                        isSelected ? "bg-brand-orange text-white" : 
+                        feedback && isCorrect ? "bg-emerald-500 text-white" :
+                        isRemoved ? "bg-transparent" :
+                        "bg-brand-navy/5 text-brand-navy/40"
+                      }`}>
+                        {isRemoved ? <Ghost className="w-4 h-4 opacity-20" /> : String.fromCharCode(65 + idx)}
+                      </span>
+                      <span className="line-clamp-2">{isRemoved ? "???" : opt}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </motion.div>
 
         <div className="flex justify-between items-center px-2">
