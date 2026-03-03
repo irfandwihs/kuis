@@ -3,8 +3,8 @@ import './globals.css'; // Global styles
 import { AuthProvider } from '@/contexts/AuthContext';
 
 export const metadata: Metadata = {
-  title: 'StudyLab - Platform Game Edukasi Interaktif',
-  description: 'StudyLab adalah platform game edukasi interaktif yang dirancang untuk membuat pembelajaran menyenangkan dan menarik.',
+  title: 'AksaraPlay - Petualangan Belajar Seru!',
+  description: 'AksaraPlay adalah platform game edukasi interaktif yang menggabungkan warisan budaya dengan keseruan bermain.',
 };
 
 export default function RootLayout({children}: {children: React.ReactNode}) {

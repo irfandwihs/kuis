@@ -8,33 +8,33 @@ import { ShoppingBag, Diamond, Check, AlertCircle, Loader2 } from "lucide-react"
 export const SHOP_ITEMS = [
   {
     id: "exp_bottle",
-    name: "ExpBottle",
-    description: "Tambah 45 EXP langsung",
-    price: 50,
+    name: "Ramuan Pintar",
+    description: "Langsung nambah 45 XP buat naikin levelmu.",
+    price: 30,
     icon: "🧪",
     color: "bg-purple-500"
   },
   {
     id: "clear_answers",
-    name: "Clear",
-    description: "Hapus 2 jawaban salah (½ EXP)",
-    price: 75,
+    name: "Sapu Bersih",
+    description: "Hapus 2 pilihan jawaban yang salah saat kuis.",
+    price: 50,
     icon: "🧹",
     color: "bg-blue-500"
   },
   {
     id: "phoenix_feather",
-    name: "PhoenixFeather",
-    description: "Selamat dari 1 jawaban salah (max 5x per game)",
-    price: 150,
+    name: "Bulu Penyelamat",
+    description: "Bikin kamu kebal dari 1 jawaban salah (Maks 5x per kuis).",
+    price: 80,
     icon: "🪶",
     color: "bg-indigo-500"
   },
   {
     id: "golden_apple",
-    name: "GoldenApple",
-    description: "2x reward diamond & EXP untuk 1 game",
-    price: 300,
+    name: "Apel Emas",
+    description: "Dapet Diamond & XP 2x lipat di satu kuis penuh!",
+    price: 150,
     icon: "🍎",
     color: "bg-red-500"
   }

@@ -10,7 +10,7 @@ import Avatar from "@/components/Avatar";
 import { motion, AnimatePresence } from "motion/react";
 
 export default function AdminDashboard() {
-  const { userData, loading } = useAuth();
+  const { userData, loading, user: currentUser } = useAuth();
   const router = useRouter();
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [fetching, setFetching] = useState(true);
@@ -65,7 +65,7 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteUser = async (userId: string, role: string) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus user ini (${role}) secara permanen? Semua data terkait (riwayat, kuis, ruangan) akan dibersihkan.`)) return;
+    if (!confirm(`Apakah Anda yakin ingin menghapus user ini (${role}) secara permanen? Semua data terkait (riwayat, kuis, ruangan) DAN AKUN AUTHENTICATION akan dibersihkan.`)) return;
     try {
       // 1. Bersihkan sub-koleksi history
       const historyRef = collection(db, "users", userId, "history");
@@ -93,15 +93,34 @@ export default function AdminDashboard() {
         }
       }
 
-      // 3. Hapus dokumen user utama
+      // 3. Hapus dokumen user utama di Firestore
       await deleteDoc(doc(db, "users", userId));
+
+      // 4. Hapus dari Firebase Authentication via API
+      if (currentUser) {
+        const idToken = await currentUser.getIdToken();
+        const response = await fetch('/api/admin/delete-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid: userId, idToken })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.warn("Firestore data deleted, but Auth deletion failed:", errorData.error);
+          alert(`Data Firestore terhapus, namun gagal menghapus akun Authentication: ${errorData.error}. Pastikan FIREBASE_SERVICE_ACCOUNT_KEY sudah dikonfigurasi.`);
+        } else {
+          alert("User dan seluruh data terkait (termasuk akun Authentication) berhasil dihapus bersih.");
+        }
+      }
+
       setAllUsers(prev => prev.filter(u => u.id !== userId));
-      alert("User dan seluruh data terkait berhasil dihapus bersih dari Firestore.");
     } catch (error) {
       console.error("Error deleting user:", error);
       alert("Gagal menghapus user.");
     }
   };
+
 
   const handleResetUser = async (userId: string) => {
     if (!confirm("Reset XP, Diamond, dan Inventory user ini?")) return;
@@ -187,8 +206,8 @@ export default function AdminDashboard() {
         </div>
 
         <div className="bg-white rounded-[40px] shadow-2xl shadow-brand-navy/5 border border-brand-navy/5 overflow-hidden">
-          {/* Table Header */}
-          <div className="grid grid-cols-12 gap-4 p-6 bg-brand-navy text-white/40 text-[9px] font-black uppercase tracking-widest">
+          {/* Table Header - Hidden on mobile */}
+          <div className="hidden md:grid grid-cols-12 gap-4 p-6 bg-brand-navy text-white/40 text-[9px] font-black uppercase tracking-widest">
             <div className="col-span-4">User Profile</div>
             <div className="col-span-2">Role</div>
             <div className="col-span-2 text-center">Performance</div>
@@ -204,9 +223,9 @@ export default function AdminDashboard() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.01 }}
                 key={user.id} 
-                className="grid grid-cols-12 gap-4 p-6 items-center hover:bg-brand-cream/30 transition-colors group"
+                className="flex flex-col md:grid md:grid-cols-12 gap-4 p-6 hover:bg-brand-cream/30 transition-colors group relative"
               >
-                <div className="col-span-4 flex items-center gap-4">
+                <div className="md:col-span-4 flex items-center gap-4">
                   <Avatar avatarString={user.avatar} size="md" className="shadow-md group-hover:scale-110 transition-transform" />
                   <div className="overflow-hidden">
                     <div className="font-black text-brand-navy truncate text-sm md:text-base">{user.displayName || "Anonymous"}</div>
@@ -216,7 +235,8 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 
-                <div className="col-span-2">
+                <div className="md:col-span-2 flex items-center justify-between md:justify-start">
+                  <span className="md:hidden text-[9px] font-black text-brand-navy/40 uppercase tracking-widest">Role:</span>
                   <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border-2 ${
                     user.role === "Guru" ? "bg-brand-orange/5 border-brand-orange text-brand-orange" : 
                     user.role === "Siswa" ? "bg-brand-navy/5 border-brand-navy text-brand-navy" : 
@@ -226,8 +246,9 @@ export default function AdminDashboard() {
                   </span>
                 </div>
                 
-                <div className="col-span-2 text-center">
-                  <div className="flex flex-col items-center">
+                <div className="md:col-span-2 flex items-center justify-between md:justify-center">
+                  <span className="md:hidden text-[9px] font-black text-brand-navy/40 uppercase tracking-widest">Performance:</span>
+                  <div className="flex flex-col items-end md:items-center">
                     <div className="flex items-center gap-1 text-brand-orange font-black text-sm">
                       <Star className="w-3 h-3 fill-current" /> {user.xp || 0}
                     </div>
@@ -237,33 +258,36 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 
-                <div className="col-span-2 text-center">
-                  <div className="flex items-center justify-center gap-1 text-sky-500 font-black text-sm">
-                    <Diamond className="w-3 h-3 fill-current" /> {user.diamonds || 0}
-                  </div>
-                  <div className="text-[9px] font-black text-brand-navy/20 uppercase tracking-widest">
-                    {Object.keys(user.inventory || {}).length} Items
+                <div className="md:col-span-2 flex items-center justify-between md:justify-center">
+                  <span className="md:hidden text-[9px] font-black text-brand-navy/40 uppercase tracking-widest">Economy:</span>
+                  <div className="flex flex-col items-end md:items-center">
+                    <div className="flex items-center justify-center gap-1 text-sky-500 font-black text-sm">
+                      <Diamond className="w-3 h-3 fill-current" /> {user.diamonds || 0}
+                    </div>
+                    <div className="text-[9px] font-black text-brand-navy/20 uppercase tracking-widest">
+                      {Object.keys(user.inventory || {}).length} Items
+                    </div>
                   </div>
                 </div>
 
-                <div className="col-span-2 flex justify-end gap-2">
+                <div className="md:col-span-2 flex justify-end gap-2 mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-brand-navy/5">
                   <button 
                     onClick={() => setEditingUser(user)}
-                    className="p-2 text-brand-navy/20 hover:text-brand-orange hover:bg-brand-orange/5 rounded-xl transition-all"
+                    className="flex-1 md:flex-none p-3 md:p-2 flex justify-center items-center text-brand-navy/40 hover:text-brand-orange hover:bg-brand-orange/5 rounded-xl transition-all bg-brand-navy/5 md:bg-transparent"
                     title="Edit User"
                   >
                     <Edit3 className="w-4 h-4" />
                   </button>
                   <button 
                     onClick={() => handleResetUser(user.id)}
-                    className="p-2 text-brand-navy/20 hover:text-sky-500 hover:bg-sky-50 rounded-xl transition-all"
+                    className="flex-1 md:flex-none p-3 md:p-2 flex justify-center items-center text-brand-navy/40 hover:text-sky-500 hover:bg-sky-50 rounded-xl transition-all bg-brand-navy/5 md:bg-transparent"
                     title="Reset Stats"
                   >
                     <RotateCcw className="w-4 h-4" />
                   </button>
                   <button 
                     onClick={() => handleDeleteUser(user.id, user.role)}
-                    className="p-2 text-brand-navy/20 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                    className="flex-1 md:flex-none p-3 md:p-2 flex justify-center items-center text-brand-navy/40 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all bg-brand-navy/5 md:bg-transparent"
                     title="Delete User"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -276,7 +300,7 @@ export default function AdminDashboard() {
         
         <footer className="mt-10 text-center">
           <p className="text-[10px] font-black text-brand-navy/20 uppercase tracking-[0.3em]">
-            StudyLab Internal Management System • Confidential
+            AksaraPlay Internal Management System • Confidential
           </p>
         </footer>
       </div>

@@ -36,6 +36,10 @@ export default function SiswaRoom() {
   const [feedback, setFeedback] = useState<"correct" | "incorrect" | null>(null);
   const [isAnswering, setIsAnswering] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  const [revealedIndices, setRevealedIndices] = useState<number[]>([]);
+  const [hiddenWordGuess, setHiddenWordGuess] = useState("");
+  const [hiddenWordGuessed, setHiddenWordGuessed] = useState(false);
+  const [hiddenWordResult, setHiddenWordResult] = useState<"correct" | "incorrect" | null>(null);
   
   // Item States
   const [inventory, setInventory] = useState<Record<string, number>>({});
@@ -126,24 +130,41 @@ export default function SiswaRoom() {
       [currentQuestionIdx]: optionIndex
     }));
 
+    const revealLetters = () => {
+      if (quiz?.quizType === "hidden_word" && quiz.hiddenWord) {
+        const wordLen = quiz.hiddenWord.length;
+        const totalQ = questions.length;
+        const lettersPerQ = Math.ceil(wordLen / totalQ);
+        
+        setRevealedIndices(prev => {
+          const unrevealed = Array.from({length: wordLen}, (_, i) => i).filter(i => !prev.includes(i));
+          const toReveal = shuffleArray(unrevealed).slice(0, lettersPerQ);
+          return [...prev, ...toReveal];
+        });
+      }
+    };
+
     if (isCorrect) {
       setFeedback("correct");
       setStreak(prev => prev + 1);
+      revealLetters();
       playSound("correct");
       confetti({
         particleCount: 100,
         spread: 70,
         origin: { y: 0.6 },
-        colors: ["#F27D26", "#141414", "#FFFFFF"]
+        colors: ["#FF5A1F", "#0D1321", "#FFFFFF"]
       });
     } else {
       // Check for Phoenix Feather
       if (phoenixFeatherUsed < 5 && inventory["phoenix_feather"] > 0) {
         setFeedback("correct"); // Treat as correct
+        setAnswers(prev => ({ ...prev, [currentQuestionIdx]: currentQ.correctAnswerIndex })); // Fix answer state
         setStreak(prev => prev + 1);
         setPhoenixFeatherUsed(prev => prev + 1);
         setInventory(prev => ({ ...prev, phoenix_feather: prev.phoenix_feather - 1 }));
         setUsedItemsInSession(prev => [...prev, "phoenix_feather"]);
+        revealLetters();
         playSound("item");
         confetti({
           particleCount: 50,
@@ -327,6 +348,80 @@ export default function SiswaRoom() {
   }
 
   if (submitted) {
+    if (quiz?.quizType === "hidden_word" && !hiddenWordGuessed && quiz.hiddenWord) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-brand-cream text-brand-navy p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white border border-brand-navy/5 p-8 md:p-12 rounded-[48px] shadow-2xl shadow-brand-navy/5 max-w-2xl w-full text-center relative overflow-hidden flex flex-col"
+          >
+            <h2 className="text-3xl font-black mb-6 text-brand-navy">Tebak Kata Rahasia!</h2>
+            <p className="text-brand-navy/60 mb-8 font-medium">Tebak kata rahasia ini untuk mendapatkan bonus XP dan Diamond!</p>
+            
+            <div className="mb-8 flex justify-center gap-2 flex-wrap">
+              {quiz.hiddenWord.split("").map((char: string, i: number) => (
+                <div key={i} className={`w-10 h-12 md:w-12 md:h-14 flex items-center justify-center text-2xl md:text-3xl font-black rounded-xl border-b-4 ${revealedIndices.includes(i) ? "bg-brand-orange text-white border-brand-orange/50" : "bg-brand-cream text-transparent border-brand-navy/10"}`}>
+                  {revealedIndices.includes(i) ? char : "_"}
+                </div>
+              ))}
+            </div>
+            
+            <input 
+              type="text"
+              value={hiddenWordGuess}
+              onChange={(e) => setHiddenWordGuess(e.target.value.toUpperCase())}
+              placeholder="Masukkan tebakanmu..."
+              className="w-full text-center p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange outline-none transition-all font-black text-brand-navy text-xl mb-6 uppercase tracking-widest"
+            />
+            
+            {hiddenWordResult === "incorrect" && (
+              <p className="text-red-500 font-bold mb-4">Tebakan salah! Coba lagi atau lewati.</p>
+            )}
+            {hiddenWordResult === "correct" && (
+              <p className="text-emerald-500 font-bold mb-4">Tebakan Benar! +50 XP & +20 Diamond</p>
+            )}
+
+            <div className="flex gap-4">
+              <button 
+                onClick={() => setHiddenWordGuessed(true)}
+                disabled={hiddenWordResult === "correct"}
+                className="flex-1 bg-brand-cream text-brand-navy font-black py-4 rounded-2xl hover:bg-brand-navy/5 transition-all disabled:opacity-50"
+              >
+                Lewati
+              </button>
+              <button 
+                onClick={async () => {
+                  if (hiddenWordGuess === quiz.hiddenWord) {
+                    setHiddenWordResult("correct");
+                    const bonusXP = 50;
+                    const bonusDiamond = 20;
+                    setScore(prev => prev + bonusXP);
+                    if (userData?.uid && room?.id) {
+                      await updateDoc(doc(db, "users", userData.uid), {
+                        xp: increment(bonusXP),
+                        diamonds: increment(bonusDiamond)
+                      });
+                      await updateDoc(doc(db, "rooms", room.id, "leaderboard", userData.uid), {
+                        score: increment(bonusXP)
+                      });
+                    }
+                    setTimeout(() => setHiddenWordGuessed(true), 2000);
+                  } else {
+                    setHiddenWordResult("incorrect");
+                  }
+                }}
+                disabled={hiddenWordResult === "correct" || !hiddenWordGuess}
+                className="flex-1 bg-brand-orange text-white font-black py-4 rounded-2xl hover:bg-brand-orange/90 transition-all shadow-lg shadow-brand-orange/20 disabled:opacity-50"
+              >
+                Tebak!
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-brand-cream text-brand-navy p-4">
         <motion.div 
@@ -540,6 +635,16 @@ export default function SiswaRoom() {
             "border-transparent"
           }`}
         >
+          {quiz?.quizType === "hidden_word" && quiz.hiddenWord && (
+            <div className="mb-8 flex justify-center gap-1.5 md:gap-2 flex-wrap">
+              {quiz.hiddenWord.split("").map((char: string, i: number) => (
+                <div key={i} className={`w-8 h-10 md:w-10 md:h-12 flex items-center justify-center text-xl md:text-2xl font-black rounded-xl border-b-4 ${revealedIndices.includes(i) ? "bg-brand-orange text-white border-brand-orange/50" : "bg-brand-cream text-transparent border-brand-navy/10"}`}>
+                  {revealedIndices.includes(i) ? char : "_"}
+                </div>
+              ))}
+            </div>
+          )}
+
           <h2 className="text-xl md:text-3xl font-black text-brand-navy mb-8 md:mb-10 leading-tight tracking-tight text-center">
             {currentQ.question}
           </h2>

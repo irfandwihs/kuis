@@ -13,6 +13,8 @@ interface Quiz {
   title: string;
   subject: string;
   questions: any[];
+  quizType?: string;
+  hiddenWord?: string;
 }
 
 interface Room {
@@ -32,7 +34,7 @@ export default function GuruDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [topic, setTopic] = useState("");
   const [numQuestions, setNumQuestions] = useState(5);
-  const [quizType, setQuizType] = useState<"multiple_choice" | "true_false" | "duck_hunt">("multiple_choice");
+  const [quizType, setQuizType] = useState<"multiple_choice" | "true_false" | "duck_hunt" | "hidden_word">("multiple_choice");
   const [viewingQuiz, setViewingQuiz] = useState<Quiz | null>(null);
   const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
   const [deletingQuizId, setDeletingQuizId] = useState<string | null>(null);
@@ -90,12 +92,41 @@ export default function GuruDashboard() {
       if (quizType === "true_false") {
         prompt = `Buatlah kuis Benar/Salah tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${numQuestions} pernyataan. Untuk setiap pertanyaan, berikan sebuah pernyataan. Pilihan jawaban (options) HARUS selalu ["Benar", "Salah"]. correctAnswerIndex adalah 0 jika pernyataan itu benar, dan 1 jika pernyataan itu salah.`;
         optionsDescription = 'Exactly 2 options: ["Benar", "Salah"]';
+      } else if (quizType === "hidden_word") {
+        prompt = `Buatlah kuis pilihan ganda tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${numQuestions} pertanyaan. Berikan 4 pilihan jawaban untuk setiap pertanyaan. SELAIN ITU, berikan satu KATA RAHASIA (hiddenWord) yang berkaitan erat dengan topik ${topic}. Kata rahasia ini sebaiknya terdiri dari 5 hingga 10 huruf tanpa spasi, gunakan huruf kapital semua.`;
+        optionsDescription = "Exactly 4 options";
       } else {
         // Both multiple_choice and duck_hunt use 4 options
         prompt = `Buatlah kuis pilihan ganda tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${numQuestions} pertanyaan. Berikan 4 pilihan jawaban untuk setiap pertanyaan.`;
         optionsDescription = "Exactly 4 options";
       }
       
+      const schemaProperties: any = {
+        title: { type: Type.STRING, description: "A catchy title for the quiz" },
+        questions: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              question: { type: Type.STRING },
+              options: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: optionsDescription
+              },
+              correctAnswerIndex: { type: Type.INTEGER, description: "Index of the correct option" }
+            },
+            required: ["question", "options", "correctAnswerIndex"]
+          }
+        }
+      };
+      const schemaRequired = ["title", "questions"];
+
+      if (quizType === "hidden_word") {
+        schemaProperties.hiddenWord = { type: Type.STRING, description: "A secret word related to the topic, 5-10 letters, no spaces, uppercase" };
+        schemaRequired.push("hiddenWord");
+      }
+
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
@@ -103,26 +134,8 @@ export default function GuruDashboard() {
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING, description: "A catchy title for the quiz" },
-              questions: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    question: { type: Type.STRING },
-                    options: {
-                      type: Type.ARRAY,
-                      items: { type: Type.STRING },
-                      description: optionsDescription
-                    },
-                    correctAnswerIndex: { type: Type.INTEGER, description: "Index of the correct option" }
-                  },
-                  required: ["question", "options", "correctAnswerIndex"]
-                }
-              }
-            },
-            required: ["title", "questions"]
+            properties: schemaProperties,
+            required: schemaRequired
           }
         }
       });
@@ -130,14 +143,18 @@ export default function GuruDashboard() {
       const generatedData = JSON.parse(response.text || "{}");
       
       if (generatedData.title && generatedData.questions) {
-        await addDoc(collection(db, "quizzes"), {
+        const quizData: any = {
           guruId: userData.uid,
           subject: userData.subject,
           title: generatedData.title,
           quizType: quizType, // Save the mode
           questions: generatedData.questions,
           createdAt: new Date()
-        });
+        };
+        if (quizType === "hidden_word" && generatedData.hiddenWord) {
+          quizData.hiddenWord = generatedData.hiddenWord;
+        }
+        await addDoc(collection(db, "quizzes"), quizData);
         await fetchQuizzes();
         setTopic("");
       }
@@ -226,7 +243,7 @@ export default function GuruDashboard() {
             </div>
             <div>
               <h1 className="text-xl md:text-2xl font-black text-brand-navy tracking-tight">Dashboard Guru</h1>
-              <p className="text-brand-navy/60 text-[10px] md:text-sm font-black uppercase tracking-widest">StudyLab • {userData.subject}</p>
+              <p className="text-brand-navy/60 text-[10px] md:text-sm font-black uppercase tracking-widest">AksaraPlay • {userData.subject}</p>
             </div>
           </div>
           <button onClick={logout} className="flex items-center gap-2 text-brand-navy/40 hover:text-brand-orange transition-colors font-black text-[10px] md:text-xs uppercase tracking-widest">
@@ -277,12 +294,13 @@ export default function GuruDashboard() {
                   <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">Mode Permainan</label>
                   <select 
                     value={quizType}
-                    onChange={(e) => setQuizType(e.target.value as "multiple_choice" | "true_false" | "duck_hunt")}
+                    onChange={(e) => setQuizType(e.target.value as "multiple_choice" | "true_false" | "duck_hunt" | "hidden_word")}
                     className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none transition-all font-bold text-brand-navy text-sm cursor-pointer appearance-none"
                   >
                     <option value="multiple_choice">Pilihan Ganda (Classic)</option>
                     <option value="true_false">Benar / Salah (Buzzer)</option>
                     <option value="duck_hunt">Berburu Bebek (Duck Hunt)</option>
+                    <option value="hidden_word">Tebak Kata Tersembunyi</option>
                   </select>
                 </div>
               </div>
@@ -346,7 +364,14 @@ export default function GuruDashboard() {
                         </button>
                       <div className="mb-4 md:mb-6">
                         <h3 className="font-black text-lg md:text-xl text-brand-navy mb-1 group-hover:text-brand-orange transition-colors line-clamp-1">{quiz.title}</h3>
-                        <p className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest">{quiz.questions.length} Pertanyaan</p>
+                        <p className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">
+                          {quiz.questions.length} Pertanyaan • {quiz.quizType === "true_false" ? "Benar/Salah" : quiz.quizType === "duck_hunt" ? "Duck Hunt" : quiz.quizType === "hidden_word" ? "Kata Tersembunyi" : "Pilihan Ganda"}
+                        </p>
+                        {quiz.quizType === "hidden_word" && quiz.hiddenWord && (
+                          <p className="text-[10px] text-brand-orange font-black uppercase tracking-widest">
+                            Kata: {quiz.hiddenWord}
+                          </p>
+                        )}
                       </div>
                       <div className="flex flex-col gap-2">
                         <button 
