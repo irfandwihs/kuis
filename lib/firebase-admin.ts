@@ -5,22 +5,21 @@ function getAdminApp() {
     return admin.apps[0];
   }
 
-  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY 
-    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
-    : undefined;
+  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  
+  if (!serviceAccountKey) {
+    console.warn("FIREBASE_SERVICE_ACCOUNT_KEY is not set. Admin features will be limited.");
+    return null;
+  }
 
-  if (serviceAccount) {
+  try {
+    const serviceAccount = JSON.parse(serviceAccountKey);
     return admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
-  } else {
-    // Fallback to default if running on Google Cloud with right permissions
-    try {
-      return admin.initializeApp();
-    } catch (e) {
-      console.warn("Firebase Admin fallback initialization failed. Authentication deletion will not work until FIREBASE_SERVICE_ACCOUNT_KEY is set.");
-      return null;
-    }
+  } catch (error: any) {
+    console.error("Failed to initialize Firebase Admin:", error.message);
+    return null;
   }
 }
 

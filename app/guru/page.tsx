@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { collection, addDoc, query, where, getDocs, orderBy, deleteDoc, doc } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs, orderBy, deleteDoc, doc, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, Play, History, LogOut, Sparkles, BookOpen, Trash2, X, Eye } from "lucide-react";
+import { Plus, Play, History, LogOut, Sparkles, BookOpen, Trash2, X, Eye, Trophy, Search, Filter } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { GoogleGenAI, Type } from "@google/genai";
+import Avatar from "@/components/Avatar";
 
 interface Quiz {
   id: string;
@@ -38,6 +39,11 @@ export default function GuruDashboard() {
   const [viewingQuiz, setViewingQuiz] = useState<Quiz | null>(null);
   const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
   const [deletingQuizId, setDeletingQuizId] = useState<string | null>(null);
+  const [topStudents, setTopStudents] = useState<any[]>([]);
+  const [isViewingLeaderboard, setIsViewingLeaderboard] = useState(false);
+  const [leaderboardFilter, setLeaderboardFilter] = useState("");
+  const [fullLeaderboard, setFullLeaderboard] = useState<any[]>([]);
+  const [isFetchingLeaderboard, setIsFetchingLeaderboard] = useState(false);
 
   const fetchQuizzes = useCallback(async () => {
     if (!userData?.uid) return;
@@ -61,30 +67,90 @@ export default function GuruDashboard() {
     }
   }, [userData?.uid]);
 
+  const fetchTopStudents = useCallback(async () => {
+    try {
+      const q = query(
+        collection(db, "users"), 
+        where("role", "==", "Siswa"),
+        orderBy("xp", "desc"),
+        limit(5)
+      );
+      const snapshot = await getDocs(q);
+      setTopStudents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (error) {
+      console.error("Error fetching top students:", error);
+    }
+  }, []);
+
+  const fetchFullLeaderboard = useCallback(async (classFilter: string) => {
+    setIsFetchingLeaderboard(true);
+    try {
+      let q;
+      if (classFilter) {
+        q = query(
+          collection(db, "users"), 
+          where("role", "==", "Siswa"),
+          where("studentClass", "==", classFilter),
+          orderBy("xp", "desc")
+        );
+      } else {
+        q = query(
+          collection(db, "users"), 
+          where("role", "==", "Siswa"),
+          orderBy("xp", "desc"),
+          limit(50)
+        );
+      }
+      const snapshot = await getDocs(q);
+      setFullLeaderboard(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (error) {
+      console.error("Error fetching full leaderboard:", error);
+    } finally {
+      setIsFetchingLeaderboard(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isViewingLeaderboard) {
+      fetchFullLeaderboard(leaderboardFilter);
+    }
+  }, [isViewingLeaderboard, leaderboardFilter, fetchFullLeaderboard]);
+
   useEffect(() => {
     const loadData = async () => {
       if (userData?.uid) {
         setIsLoading(true);
-        await Promise.all([fetchQuizzes(), fetchRooms()]);
+        await Promise.all([fetchQuizzes(), fetchRooms(), fetchTopStudents()]);
         setIsLoading(false);
       }
     };
     loadData();
-  }, [userData, fetchQuizzes, fetchRooms]);
+  }, [userData, fetchQuizzes, fetchRooms, fetchTopStudents]);
 
   const generateQuizWithAI = async () => {
     if (!topic || !userData?.subject) return;
     
-    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-    if (!apiKey) {
+    // Collect all available Gemini API keys for rotation
+    const apiKeys = [
+      process.env.NEXT_PUBLIC_GEMINI_API_KEY,
+      process.env.NEXT_PUBLIC_GEMINI_API_KEY_2,
+      process.env.NEXT_PUBLIC_GEMINI_API_KEY_3,
+      process.env.NEXT_PUBLIC_GEMINI_API_KEY_4,
+      process.env.NEXT_PUBLIC_GEMINI_API_KEY_5,
+    ].filter(Boolean) as string[];
+
+    if (apiKeys.length === 0) {
       alert("API Key Gemini belum dikonfigurasi. Silakan hubungi administrator.");
       return;
     }
 
     setIsGenerating(true);
     
-    try {
-      const ai = new GoogleGenAI({ apiKey });
+    let lastError = "";
+    for (let i = 0; i < apiKeys.length; i++) {
+      const apiKey = apiKeys[i];
+      try {
+        const ai = new GoogleGenAI({ apiKey });
       
       let prompt = "";
       let optionsDescription = "";
@@ -142,28 +208,43 @@ export default function GuruDashboard() {
 
       const generatedData = JSON.parse(response.text || "{}");
       
-      if (generatedData.title && generatedData.questions) {
-        const quizData: any = {
-          guruId: userData.uid,
-          subject: userData.subject,
-          title: generatedData.title,
-          quizType: quizType, // Save the mode
-          questions: generatedData.questions,
-          createdAt: new Date()
-        };
-        if (quizType === "hidden_word" && generatedData.hiddenWord) {
-          quizData.hiddenWord = generatedData.hiddenWord;
+        if (generatedData.title && generatedData.questions) {
+          const quizData: any = {
+            guruId: userData.uid,
+            subject: userData.subject,
+            title: generatedData.title,
+            quizType: quizType, // Save the mode
+            questions: generatedData.questions,
+            createdAt: new Date()
+          };
+          if (quizType === "hidden_word" && generatedData.hiddenWord) {
+            quizData.hiddenWord = generatedData.hiddenWord;
+          }
+          await addDoc(collection(db, "quizzes"), quizData);
+          await fetchQuizzes();
+          setTopic("");
+          setIsGenerating(false);
+          return; // Success! Exit the function
         }
-        await addDoc(collection(db, "quizzes"), quizData);
-        await fetchQuizzes();
-        setTopic("");
+      } catch (error: any) {
+        console.error(`Error with API Key ${i + 1}:`, error);
+        lastError = error.message || "Unknown error";
+        
+        // If it's a rate limit error (429), try the next key
+        if (lastError.includes("429") || lastError.toLowerCase().includes("quota") || lastError.toLowerCase().includes("limit")) {
+          if (i < apiKeys.length - 1) {
+            console.warn(`API Key ${i + 1} hit rate limit. Trying next key...`);
+            continue;
+          }
+        }
+        
+        // If it's not a rate limit error, or we're out of keys, break and show error
+        break;
       }
-    } catch (error) {
-      console.error("Error generating quiz:", error);
-      alert("Failed to generate quiz. Check console for details.");
-    } finally {
-      setIsGenerating(false);
     }
+
+    setIsGenerating(false);
+    alert(`Gagal membuat kuis: ${lastError}. Silakan coba lagi nanti.`);
   };
 
   const createRoom = async (quizId: string) => {
@@ -389,7 +470,7 @@ export default function GuruDashboard() {
             </section>
           </div>
 
-          {/* Room History */}
+          {/* Room History & Student Ranking */}
           <div className="space-y-6">
             <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5">
               <h2 className="text-xl md:text-2xl font-black text-brand-navy mb-6 md:mb-8 flex items-center gap-3 tracking-tight">
@@ -444,9 +525,147 @@ export default function GuruDashboard() {
                 </div>
               )}
             </section>
+
+            {/* Student Ranking Monitoring */}
+            <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5">
+              <div className="flex items-center justify-between mb-6 md:mb-8">
+                <h2 className="text-xl md:text-2xl font-black text-brand-navy flex items-center gap-3 tracking-tight">
+                  <Trophy className="w-6 h-6 md:w-7 md:h-7 text-brand-orange" />
+                  Peringkat Siswa
+                </h2>
+                <button 
+                  onClick={() => setIsViewingLeaderboard(true)}
+                  className="text-[10px] font-black text-brand-orange uppercase tracking-widest hover:underline"
+                >
+                  Lihat Semua
+                </button>
+              </div>
+              {topStudents.length === 0 ? (
+                <p className="text-brand-navy/40 text-center py-8 text-sm font-bold">Belum ada data peringkat.</p>
+              ) : (
+                <div className="space-y-4">
+                  {topStudents.map((student, index) => (
+                    <div key={student.id} className="flex items-center justify-between p-4 bg-brand-cream/30 rounded-3xl border border-transparent hover:border-brand-orange/10 transition-all">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs ${
+                          index === 0 ? "bg-yellow-400 text-white" : 
+                          index === 1 ? "bg-slate-300 text-white" : 
+                          index === 2 ? "bg-amber-600 text-white" : 
+                          "bg-brand-navy/10 text-brand-navy"
+                        }`}>
+                          {index + 1}
+                        </div>
+                        <Avatar avatarString={student.avatar} size="sm" />
+                        <div>
+                          <p className="font-black text-brand-navy text-sm leading-tight">{student.displayName}</p>
+                          <p className="text-[10px] font-bold text-brand-navy/40 uppercase tracking-widest">{student.studentClass || "Siswa"}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-black text-brand-orange text-sm">{student.xp} XP</p>
+                        <p className="text-[8px] font-bold text-brand-navy/30 uppercase tracking-widest">Level {Math.floor((student.xp || 0) / 100) + 1}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
         </div>
       </div>
+
+      {/* Full Leaderboard Modal */}
+      {isViewingLeaderboard && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-3xl max-h-[90vh] rounded-[48px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-8 border-b border-brand-navy/5 flex items-center justify-between bg-brand-cream/20">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-brand-orange rounded-2xl flex items-center justify-center shadow-lg shadow-brand-orange/20">
+                  <Trophy className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black text-brand-navy tracking-tight">Papan Peringkat Global</h2>
+                  <p className="text-xs font-bold text-brand-navy/40 uppercase tracking-widest">Pantau kemajuan seluruh siswa</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsViewingLeaderboard(false)}
+                className="p-3 bg-white rounded-2xl text-brand-navy/20 hover:text-brand-orange transition-all shadow-sm"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 bg-white border-b border-brand-navy/5 flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-navy/20" />
+                <select 
+                  value={leaderboardFilter}
+                  onChange={(e) => setLeaderboardFilter(e.target.value)}
+                  className="w-full pl-12 pr-4 py-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none text-brand-navy font-bold transition-all appearance-none cursor-pointer"
+                >
+                  <option value="">Semua Kelas</option>
+                  {["7A", "7B", "7C", "7D", "7E", "7F", "7G", "7H", 
+                    "8A", "8B", "8C", "8D", "8E", "8F", "8G", "8H", 
+                    "9A", "9B", "9C", "9D", "9E", "9F", "9G", "9H"].map(cls => (
+                    <option key={cls} value={cls}>Kelas {cls}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center px-6 py-4 bg-brand-orange/5 rounded-2xl border border-brand-orange/10">
+                <p className="text-xs font-black text-brand-orange uppercase tracking-widest">
+                  Total: {fullLeaderboard.length} Siswa
+                </p>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+              {isFetchingLeaderboard ? (
+                <div className="flex flex-col items-center justify-center py-20">
+                  <div className="w-12 h-12 border-4 border-brand-orange border-t-transparent rounded-full animate-spin mb-4" />
+                  <p className="text-xs font-black text-brand-navy/40 uppercase tracking-widest animate-pulse">Memuat Data...</p>
+                </div>
+              ) : fullLeaderboard.length === 0 ? (
+                <div className="text-center py-20">
+                  <Trophy className="w-16 h-16 text-brand-navy/10 mx-auto mb-4" />
+                  <p className="text-brand-navy/40 font-bold">Tidak ada data untuk filter ini.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {fullLeaderboard.map((student, index) => (
+                    <div key={student.id} className="flex items-center justify-between p-5 bg-brand-cream/20 rounded-[32px] border border-transparent hover:border-brand-orange/20 transition-all">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm ${
+                          index === 0 ? "bg-yellow-400 text-white shadow-lg shadow-yellow-400/20" : 
+                          index === 1 ? "bg-slate-300 text-white shadow-lg shadow-slate-300/20" : 
+                          index === 2 ? "bg-amber-600 text-white shadow-lg shadow-amber-600/20" : 
+                          "bg-white text-brand-navy/40 shadow-sm"
+                        }`}>
+                          {index + 1}
+                        </div>
+                        <Avatar avatarString={student.avatar} size="md" />
+                        <div>
+                          <p className="font-black text-brand-navy text-lg leading-tight">{student.displayName}</p>
+                          <p className="text-[10px] font-bold text-brand-navy/40 uppercase tracking-widest">Kelas {student.studentClass || "-"}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="flex items-center justify-end gap-2 mb-1">
+                          <Sparkles className="w-4 h-4 text-brand-orange" />
+                          <p className="font-black text-brand-orange text-xl">{student.xp}</p>
+                          <span className="text-[10px] font-black text-brand-orange/40 uppercase">XP</span>
+                        </div>
+                        <p className="text-[10px] font-bold text-brand-navy/30 uppercase tracking-widest">Level {Math.floor((student.xp || 0) / 100) + 1}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Quiz Details Modal */}
       {viewingQuiz && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-sm animate-in fade-in">

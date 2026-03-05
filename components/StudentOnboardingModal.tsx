@@ -92,14 +92,19 @@ export default function StudentOnboardingModal() {
                   </label>
                   <div className="relative">
                     <GraduationCap className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-navy/20" />
-                    <input
-                      type="text"
+                    <select
                       required
                       value={studentClass}
                       onChange={(e) => setStudentClass(e.target.value)}
-                      placeholder="Contoh: 12 IPA 1"
-                      className="w-full pl-12 pr-4 py-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none text-brand-navy font-bold transition-all"
-                    />
+                      className="w-full pl-12 pr-4 py-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none text-brand-navy font-bold transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="" disabled>Pilih Kelas</option>
+                      {["7A", "7B", "7C", "7D", "7E", "7F", "7G", "7H", 
+                        "8A", "8B", "8C", "8D", "8E", "8F", "8G", "8H", 
+                        "9A", "9B", "9C", "9D", "9E", "9F", "9G", "9H"].map(cls => (
+                        <option key={cls} value={cls}>Kelas {cls}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>

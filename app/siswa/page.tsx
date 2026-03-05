@@ -37,13 +37,13 @@ export default function SiswaDashboard() {
         setGlobalLeaderboard(users);
 
         // 2. Calculate Actual Global Rank (Siswa only)
-        if (!userData.quizzesPlayed || userData.quizzesPlayed === 0) {
+        if (userData.xp === undefined || userData.xp === null) {
           setRank("-");
         } else {
           const qRank = query(
             collection(db, "users"), 
             where("role", "==", "Siswa"),
-            where("xp", ">", userData.xp || 0)
+            where("xp", ">", userData.xp)
           );
           const rankSnapshot = await getCountFromServer(qRank);
           const actualRank = rankSnapshot.data().count + 1;
