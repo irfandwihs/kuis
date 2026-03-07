@@ -6,54 +6,34 @@ import { GraduationCap, BookOpen } from "lucide-react";
 
 const SUBJECTS = [
   "Matematika",
-  "Sains",
-  "Sejarah",
-  "Bahasa",
+  "IPA",
+  "IPS",
+  "Bahasa Indonesia",
+  "Bahasa Inggris",
+  "Bahasa Jawa",
   "Informatika",
-  "Seni",
-];
-const CLASSES = [
-  "7A",
-  "7B",
-  "7C",
-  "7D",
-  "7E",
-  "7F",
-  "7G",
-  "7H",
-  "8A",
-  "8B",
-  "8C",
-  "8D",
-  "8E",
-  "8F",
-  "8G",
-  "8H",
-  "9A",
-  "9B",
-  "9C",
-  "9D",
-  "9E",
-  "9F",
-  "9G",
-  "9H",
+  "Seni Budaya",
+  "Prakarya",
+  "PJOK",
+  "Agama Islam",
+  "Agama Kristen",
+  "Agama Katolik",
+  "Agama Hindu",
+  "Agama Buddha",
+  "Pendidikan Pancasila",
+  "Koding dan KA",
 ];
 
 export default function Onboarding() {
   const { setRole, userData } = useAuth();
   const [selectedRole, setSelectedRole] = useState<Role>(null);
   const [selectedSubject, setSelectedSubject] = useState<string>("");
-  const [selectedClass, setSelectedClass] = useState<string>("");
 
   const handleComplete = async () => {
     if (!selectedRole) return;
     if (selectedRole === "Guru" && !selectedSubject) return;
-    if (selectedRole === "Siswa" && !selectedClass) return;
 
-    await setRole(
-      selectedRole,
-      selectedRole === "Guru" ? selectedSubject : selectedClass,
-    );
+    await setRole(selectedRole, selectedRole === "Guru" ? selectedSubject : "");
   };
 
   if (userData?.role) {
@@ -137,34 +117,10 @@ export default function Onboarding() {
             </div>
           )}
 
-          {selectedRole === "Siswa" && (
-            <div className="mb-8 md:mb-12 animate-in fade-in slide-in-from-bottom-4">
-              <label className="block text-xs font-black text-brand-navy/40 uppercase tracking-widest mb-3 ml-1">
-                Pilih Kelas Anda
-              </label>
-              <select
-                value={selectedClass}
-                onChange={(e) => setSelectedClass(e.target.value)}
-                className="w-full p-5 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-navy focus:bg-white outline-none text-brand-navy font-bold transition-all appearance-none"
-              >
-                <option value="" disabled>
-                  Pilih kelas...
-                </option>
-                {CLASSES.map((cls) => (
-                  <option key={cls} value={cls}>
-                    {cls}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
           <button
             onClick={handleComplete}
             disabled={
-              !selectedRole ||
-              (selectedRole === "Guru" && !selectedSubject) ||
-              (selectedRole === "Siswa" && !selectedClass)
+              !selectedRole || (selectedRole === "Guru" && !selectedSubject)
             }
             className="w-full bg-brand-navy text-white font-black text-xl py-5 rounded-3xl hover:bg-brand-black transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-brand-navy/20 active:scale-95"
           >
