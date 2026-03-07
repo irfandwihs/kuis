@@ -3,13 +3,27 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
-import { LogOut, Play, Trophy, Star, Zap, History, Users, Diamond, ShoppingBag, Home, FileText, BookOpen } from "lucide-react";
+import { LogOut, Play, Trophy, Star, Zap, History, Users, Diamond, ShoppingBag, Home, FileText, BookOpen, Eye, Link as LinkIcon, X } from "lucide-react";
 import { collection, query, orderBy, getDocs, doc, updateDoc, limit, getCountFromServer, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import StudentOnboardingModal from "@/components/StudentOnboardingModal";
 import Avatar from "@/components/Avatar";
 import { motion } from "motion/react";
 import Shop from "@/components/Shop";
+
+interface Material {
+  id: string;
+  guruId: string;
+  subject: string;
+  title: string;
+  description: string;
+  content?: string;
+  points?: string[];
+  fileUrl?: string;
+  fileName?: string;
+  order: number;
+  createdAt: any;
+}
 
 export default function SiswaDashboard() {
   const { userData, logout } = useAuth();
@@ -18,6 +32,8 @@ export default function SiswaDashboard() {
   const [rank, setRank] = useState<number | string>("-");
   const [quizHistory, setQuizHistory] = useState<any[]>([]);
   const [globalLeaderboard, setGlobalLeaderboard] = useState<any[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [viewingMaterial, setViewingMaterial] = useState<Material | null>(null);
   const [mainTab, setMainTab] = useState<"beranda" | "kuis" | "tugas" | "materi">("beranda");
   const [berandaTab, setBerandaTab] = useState<"history" | "leaderboard" | "shop">("history");
 
@@ -56,6 +72,11 @@ export default function SiswaDashboard() {
         const snapshotHistory = await getDocs(qHistory);
         const historyData = snapshotHistory.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setQuizHistory(historyData);
+        // 4. Fetch Materials
+        const qMaterials = query(collection(db, "materials"), orderBy("order", "asc"));
+        const snapshotMaterials = await getDocs(qMaterials);
+        const materialsData = snapshotMaterials.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setMaterials(materialsData);
       } catch (error) {
         console.error("Error fetching data:", error);
       }
@@ -114,18 +135,18 @@ export default function SiswaDashboard() {
         </header>
 
         <div className="grid grid-cols-4 gap-3 mb-6">
-          <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center">
-            <div className="p-2 bg-brand-orange/10 text-brand-orange rounded-xl mb-2">
+          <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center group hover:border-brand-orange transition-all">
+            <div className="p-2 bg-brand-orange/10 text-brand-orange rounded-xl mb-2 group-hover:scale-110 transition-transform">
               <Trophy className="w-5 h-5" />
             </div>
-            <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">Rank</div>
+            <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">Peringkat</div>
             <div className="text-lg font-black text-brand-navy">{rank}</div>
           </div>
-          <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center">
-            <div className="p-2 bg-brand-navy/10 text-brand-navy rounded-xl mb-2">
+          <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center group hover:border-brand-orange transition-all">
+            <div className="p-2 bg-brand-navy/10 text-brand-navy rounded-xl mb-2 group-hover:scale-110 transition-transform">
               <Zap className="w-5 h-5" />
             </div>
-            <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">XP</div>
+            <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">Total XP</div>
             <div className="text-lg font-black text-brand-navy">{xp}</div>
           </div>
           <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center">
@@ -208,9 +229,14 @@ export default function SiswaDashboard() {
 
               {berandaTab === "leaderboard" && (
                 <div className="bg-white p-6 md:p-8 rounded-[40px] shadow-xl shadow-brand-navy/5 w-full border border-brand-navy/5 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                  <div className="flex items-center gap-3 mb-6">
-                    <Users className="w-6 h-6 text-brand-orange" />
-                    <h2 className="text-xl font-black text-brand-navy tracking-tight">Peringkat Global</h2>
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <Trophy className="w-6 h-6 text-brand-orange" />
+                      <h2 className="text-xl font-black text-brand-navy tracking-tight">Peringkat Global</h2>
+                    </div>
+                    <div className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest">
+                      Peringkatmu: <span className="text-brand-orange">{rank}</span>
+                    </div>
                   </div>
 
                   {/* Podium Section */}
@@ -358,15 +384,135 @@ export default function SiswaDashboard() {
         )}
 
         {mainTab === "materi" && (
-          <div className="flex flex-col items-center justify-center py-12 text-center animate-in fade-in zoom-in-95 duration-300">
-            <div className="w-20 h-20 bg-brand-cream/50 text-brand-navy/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
-              <BookOpen className="w-10 h-10" />
-            </div>
-            <h2 className="text-2xl font-black text-brand-navy mb-2 tracking-tight">Materi</h2>
-            <p className="text-brand-navy/60 text-sm font-medium">Materi pelajaran akan muncul di sini.</p>
+          <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+            <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5">
+              <div className="flex items-center justify-between mb-6 md:mb-8">
+                <h2 className="text-xl md:text-2xl font-black text-brand-navy flex items-center gap-3 tracking-tight">
+                  <BookOpen className="w-6 h-6 md:w-7 md:h-7 text-brand-orange" />
+                  Materi Pembelajaran
+                </h2>
+              </div>
+
+              {materials.length === 0 ? (
+                <div className="text-center py-12 md:py-16 bg-brand-cream/30 rounded-[32px] border-2 border-dashed border-brand-navy/10">
+                  <BookOpen className="w-10 h-10 md:w-12 md:h-12 text-brand-navy/20 mx-auto mb-4" />
+                  <p className="text-brand-navy/40 text-sm font-bold">Belum ada materi yang tersedia.</p>
+                </div>
+              ) : (
+                <div className="relative py-10">
+                  {/* Duolingo-like path line */}
+                  <div className="absolute left-1/2 top-0 bottom-0 w-3 bg-brand-cream -translate-x-1/2 rounded-full hidden md:block" />
+                  
+                  <div className="space-y-12 relative z-10">
+                    {materials.map((mat, idx) => {
+                      // Zig-zag logic
+                      const positions = ["md:-translate-x-24", "md:translate-x-24", "md:translate-x-0"];
+                      const posClass = positions[idx % 3];
+                      
+                      return (
+                        <div key={mat.id} className={`flex flex-col items-center transition-all ${posClass}`}>
+                          <div className="relative group">
+                            <button 
+                              onClick={() => setViewingMaterial(mat)}
+                              className="w-20 h-20 md:w-24 md:h-24 rounded-[32px] bg-white border-4 border-brand-cream flex items-center justify-center shadow-xl hover:scale-110 hover:border-brand-orange transition-all relative z-20 group"
+                            >
+                              <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-brand-navy flex items-center justify-center text-white font-black text-xl md:text-2xl group-hover:bg-brand-orange transition-colors">
+                                {idx + 1}
+                              </div>
+                              
+                              {/* Tooltip-like label */}
+                              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-brand-navy text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-xl">
+                                {mat.title}
+                              </div>
+                            </button>
+                            
+                            {mat.fileUrl && (
+                              <a 
+                                href={mat.fileUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="absolute -right-12 top-1/2 -translate-y-1/2 p-2 bg-white text-brand-navy rounded-xl shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hover:text-brand-orange"
+                                title="Buka File Eksternal"
+                              >
+                                <LinkIcon className="w-4 h-4" />
+                              </a>
+                            )}
+                          </div>
+                          
+                          <div className="mt-4 text-center max-w-[200px]">
+                            <h3 className="font-black text-brand-navy text-sm mb-1 truncate">{mat.title}</h3>
+                            <p className="text-[10px] font-bold text-brand-navy/40 uppercase tracking-widest">{mat.subject}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </section>
           </div>
         )}
       </div>
+
+      {/* View Material Modal */}
+      {viewingMaterial && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-3xl max-h-[90vh] rounded-[40px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-6 md:p-8 border-b border-brand-navy/5 flex justify-between items-center bg-brand-cream/30">
+              <div>
+                <span className="inline-block px-2 py-1 bg-brand-orange/10 text-brand-orange text-[10px] font-black uppercase tracking-widest rounded-md mb-2">
+                  {viewingMaterial.subject}
+                </span>
+                <h2 className="text-xl md:text-2xl font-black text-brand-navy tracking-tight">{viewingMaterial.title}</h2>
+              </div>
+              <button 
+                onClick={() => setViewingMaterial(null)}
+                className="p-2 hover:bg-brand-navy/5 rounded-full transition-colors text-brand-navy/40 hover:text-brand-navy"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 md:p-8">
+              {viewingMaterial.points && viewingMaterial.points.length > 0 ? (
+                <div className="space-y-8 relative py-4">
+                  <div className="absolute left-6 top-0 bottom-0 w-1 bg-brand-cream rounded-full" />
+                  {viewingMaterial.points.map((point, idx) => (
+                    <div key={idx} className="flex gap-6 relative z-10 animate-in slide-in-from-left duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+                      <div className="w-12 h-12 rounded-2xl bg-brand-navy text-white flex items-center justify-center font-black text-lg shadow-lg shadow-brand-navy/20 flex-shrink-0">
+                        {idx + 1}
+                      </div>
+                      <div className="flex-1 p-6 bg-brand-cream/30 rounded-3xl border border-brand-navy/5 font-medium text-brand-navy leading-relaxed">
+                        {point}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : viewingMaterial.content ? (
+                <div className="prose prose-sm md:prose-base max-w-none text-brand-navy/80 whitespace-pre-wrap">
+                  {viewingMaterial.content}
+                </div>
+              ) : viewingMaterial.fileUrl ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <FileText className="w-16 h-16 text-brand-orange mb-4" />
+                  <p className="text-brand-navy font-bold mb-6">Materi ini berupa file dokumen.</p>
+                  <a 
+                    href={viewingMaterial.fileUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="bg-brand-navy text-white px-6 py-3 rounded-xl font-black uppercase tracking-widest hover:bg-brand-black transition-colors"
+                  >
+                    Buka File {viewingMaterial.fileName}
+                  </a>
+                </div>
+              ) : (
+                <p className="text-center text-brand-navy/40">Konten tidak tersedia.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-brand-navy/10 flex justify-around items-center p-4 pb-safe z-50 md:hidden shadow-[0_-10px_40px_rgba(0,0,0,0.05)] rounded-t-3xl">

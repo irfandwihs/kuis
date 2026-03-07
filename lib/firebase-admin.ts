@@ -20,7 +20,13 @@ function getAdminApp() {
   try {
     // Handle potential double-escaping or stringified JSON
     let serviceAccount;
-    const sanitizedKey = serviceAccountKey.trim();
+    let sanitizedKey = serviceAccountKey.trim();
+    
+    // Remove leading/trailing quotes if they exist (common mistake in Vercel/Env vars)
+    if ((sanitizedKey.startsWith("'") && sanitizedKey.endsWith("'")) || 
+        (sanitizedKey.startsWith('"') && sanitizedKey.endsWith('"'))) {
+      sanitizedKey = sanitizedKey.substring(1, sanitizedKey.length - 1);
+    }
     
     try {
       serviceAccount = JSON.parse(sanitizedKey);

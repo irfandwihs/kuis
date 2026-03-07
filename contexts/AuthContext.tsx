@@ -78,6 +78,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             xp: 0,
             diamonds: 0,
             quizzesPlayed: 0,
+            avatar: "0",
             inventory: {}
           };
           await setDoc(userDocRef, newUserData);

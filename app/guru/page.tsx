@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { collection, addDoc, query, where, getDocs, orderBy, deleteDoc, doc, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, Play, History, LogOut, Sparkles, BookOpen, Trash2, X, Eye, Trophy, Search, Filter, Home, FileText } from "lucide-react";
+import { Plus, Play, History, LogOut, Sparkles, BookOpen, Trash2, X, Eye, Trophy, Search, Filter, Home, FileText, Users, Link as LinkIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { GoogleGenAI, Type } from "@google/genai";
 import Avatar from "@/components/Avatar";
@@ -23,6 +23,20 @@ interface Room {
   roomCode: string;
   quizId: string;
   status: string;
+  createdAt: any;
+}
+
+interface Material {
+  id: string;
+  guruId: string;
+  subject: string;
+  title: string;
+  description: string;
+  content?: string;
+  points?: string[];
+  fileUrl?: string;
+  fileName?: string;
+  order: number;
   createdAt: any;
 }
 
@@ -46,6 +60,34 @@ export default function GuruDashboard() {
   const [isFetchingLeaderboard, setIsFetchingLeaderboard] = useState(false);
   const [mainTab, setMainTab] = useState<"beranda" | "kuis" | "tugas" | "materi">("beranda");
 
+  // Manual Quiz State
+  const [isCreatingManualQuiz, setIsCreatingManualQuiz] = useState(false);
+  const [manualQuizTitle, setManualQuizTitle] = useState("");
+  const [manualQuizType, setManualQuizType] = useState<"multiple_choice" | "true_false" | "duck_hunt" | "hidden_word">("multiple_choice");
+  const [manualHiddenWord, setManualHiddenWord] = useState("");
+  const [manualQuestions, setManualQuestions] = useState<any[]>([]);
+  const [currentManualQuestion, setCurrentManualQuestion] = useState("");
+  const [currentManualOptions, setCurrentManualOptions] = useState(["", "", "", ""]);
+  const [currentManualCorrectIdx, setCurrentManualCorrectIdx] = useState(0);
+
+  // Material State
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [isCreatingMaterial, setIsCreatingMaterial] = useState(false);
+  const [materialTitle, setMaterialTitle] = useState("");
+  const [materialDesc, setMaterialDesc] = useState("");
+  const [materialType, setMaterialType] = useState<"text" | "link">("text");
+  const [materialContent, setMaterialContent] = useState("");
+  const [materialPoints, setMaterialPoints] = useState<string[]>([""]);
+  const [materialLink, setMaterialLink] = useState("");
+  const [showMaterialErrors, setShowMaterialErrors] = useState(false);
+  const [isUploadingMaterial, setIsUploadingMaterial] = useState(false);
+  const [deletingMaterialId, setDeletingMaterialId] = useState<string | null>(null);
+  const [viewingMaterial, setViewingMaterial] = useState<Material | null>(null);
+
+  const [viewingRoomLeaderboard, setViewingRoomLeaderboard] = useState<any[]>([]);
+  const [isFetchingRoomLeaderboard, setIsFetchingRoomLeaderboard] = useState(false);
+  const [viewingRoomId, setViewingRoomId] = useState<string | null>(null);
+
   const fetchQuizzes = useCallback(async () => {
     if (!userData?.uid) return;
     try {
@@ -65,6 +107,17 @@ export default function GuruDashboard() {
       setRooms(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Room)));
     } catch (error) {
       console.error("Error fetching rooms:", error);
+    }
+  }, [userData?.uid]);
+
+  const fetchMaterials = useCallback(async () => {
+    if (!userData?.uid) return;
+    try {
+      const q = query(collection(db, "materials"), where("guruId", "==", userData.uid), orderBy("order", "asc"));
+      const snapshot = await getDocs(q);
+      setMaterials(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Material)));
+    } catch (error) {
+      console.error("Error fetching materials:", error);
     }
   }, [userData?.uid]);
 
@@ -121,12 +174,27 @@ export default function GuruDashboard() {
     const loadData = async () => {
       if (userData?.uid) {
         setIsLoading(true);
-        await Promise.all([fetchQuizzes(), fetchRooms(), fetchTopStudents()]);
+        await Promise.all([fetchQuizzes(), fetchRooms(), fetchTopStudents(), fetchMaterials()]);
         setIsLoading(false);
       }
     };
     loadData();
-  }, [userData, fetchQuizzes, fetchRooms, fetchTopStudents]);
+  }, [userData, fetchQuizzes, fetchRooms, fetchTopStudents, fetchMaterials]);
+
+  const fetchRoomLeaderboard = async (roomId: string) => {
+    setIsFetchingRoomLeaderboard(true);
+    setViewingRoomId(roomId);
+    try {
+      const lbRef = collection(db, "rooms", roomId, "leaderboard");
+      const q = query(lbRef, orderBy("score", "desc"));
+      const snapshot = await getDocs(q);
+      setViewingRoomLeaderboard(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (error) {
+      console.error("Error fetching room leaderboard:", error);
+    } finally {
+      setIsFetchingRoomLeaderboard(false);
+    }
+  };
 
   const generateQuizWithAI = async () => {
     if (!topic || !userData?.subject) return;
@@ -304,6 +372,75 @@ export default function GuruDashboard() {
     }
   };
 
+  const deleteMaterial = async (materialId: string) => {
+    if (deletingMaterialId !== materialId) {
+      setDeletingMaterialId(materialId);
+      setTimeout(() => setDeletingMaterialId(null), 3000);
+      return;
+    }
+    
+    try {
+      setDeletingMaterialId(null);
+      const matRef = doc(db, "materials", materialId);
+      await deleteDoc(matRef);
+      setMaterials(prev => prev.filter(m => m.id !== materialId));
+    } catch (error: any) {
+      console.error("Error deleting material:", error);
+      alert(`Gagal menghapus: ${error.message}`);
+    }
+  };
+
+  const handleCreateMaterial = async () => {
+    setShowMaterialErrors(true);
+    
+    if (!materialTitle.trim() || !materialDesc.trim()) {
+      alert("Judul dan deskripsi harus diisi.");
+      return;
+    }
+    
+    if (materialType === "text" && materialPoints.every(p => !p.trim())) {
+      alert("Konten materi harus diisi minimal 1 poin.");
+      return;
+    }
+    
+    if (materialType === "link" && !materialLink.trim()) {
+      alert("Link materi harus diisi.");
+      return;
+    }
+
+    setIsUploadingMaterial(true);
+    try {
+      const newMaterial = {
+        guruId: userData?.uid,
+        subject: userData?.subject,
+        title: materialTitle,
+        description: materialDesc,
+        content: "",
+        points: materialType === "text" ? materialPoints.filter(p => p.trim() !== "") : [],
+        fileUrl: materialType === "link" ? materialLink : "",
+        fileName: materialType === "link" ? "Link Eksternal" : "",
+        order: materials.length + 1,
+        createdAt: new Date()
+      };
+
+      await addDoc(collection(db, "materials"), newMaterial);
+      await fetchMaterials();
+      
+      setIsCreatingMaterial(false);
+      setShowMaterialErrors(false);
+      setMaterialTitle("");
+      setMaterialDesc("");
+      setMaterialContent("");
+      setMaterialPoints([""]);
+      setMaterialLink("");
+    } catch (error: any) {
+      console.error("Error creating material:", error);
+      alert(`Gagal membuat materi: ${error.message}`);
+    } finally {
+      setIsUploadingMaterial(false);
+    }
+  };
+
   if (!userData) return null;
 
   if (isLoading) {
@@ -413,7 +550,20 @@ export default function GuruDashboard() {
                   <BookOpen className="w-6 h-6 md:w-7 md:h-7 text-brand-orange" />
                   Koleksi Kuis
                 </h2>
-                <span className="bg-brand-cream text-brand-navy/60 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">{quizzes.length} Kuis</span>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => {
+                      setIsCreatingManualQuiz(true);
+                      setManualQuizType("multiple_choice");
+                      setCurrentManualOptions(["", "", "", ""]);
+                      setCurrentManualCorrectIdx(0);
+                    }} 
+                    className="bg-brand-navy text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-brand-black transition-colors"
+                  >
+                    <Plus className="w-4 h-4" /> Manual
+                  </button>
+                  <span className="bg-brand-cream text-brand-navy/60 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest hidden sm:inline-block">{quizzes.length} Kuis</span>
+                </div>
               </div>
 
               {quizzes.length === 0 ? (
@@ -533,7 +683,7 @@ export default function GuruDashboard() {
               <div className="flex items-center justify-between mb-6 md:mb-8">
                 <h2 className="text-xl md:text-2xl font-black text-brand-navy flex items-center gap-3 tracking-tight">
                   <Trophy className="w-6 h-6 md:w-7 md:h-7 text-brand-orange" />
-                  Peringkat Siswa
+                  Peringkat Global Siswa
                 </h2>
                 <button 
                   onClick={() => setIsViewingLeaderboard(true)}
@@ -542,6 +692,9 @@ export default function GuruDashboard() {
                   Lihat Semua
                 </button>
               </div>
+              <p className="text-[10px] font-bold text-brand-navy/40 uppercase tracking-widest mb-4 bg-brand-cream/50 p-3 rounded-xl">
+                * Peringkat global dihitung berdasarkan akumulasi XP dari seluruh kuis yang telah dikerjakan siswa.
+              </p>
               {topStudents.length === 0 ? (
                 <p className="text-brand-navy/40 text-center py-8 text-sm font-bold">Belum ada data peringkat.</p>
               ) : (
@@ -572,8 +725,129 @@ export default function GuruDashboard() {
                 </div>
               )}
             </section>
+
+            {/* Room History / Quiz Results */}
+            <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5">
+              <div className="flex items-center justify-between mb-6 md:mb-8">
+                <h2 className="text-xl md:text-2xl font-black text-brand-navy flex items-center gap-3 tracking-tight">
+                  <History className="w-6 h-6 md:w-7 md:h-7 text-brand-orange" />
+                  Riwayat Ruangan & Hasil Kuis
+                </h2>
+                <span className="bg-brand-cream text-brand-navy/60 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">{rooms.length} Ruangan</span>
+              </div>
+              
+              {rooms.length === 0 ? (
+                <div className="text-center py-12 bg-brand-cream/30 rounded-[32px] border-2 border-dashed border-brand-navy/10">
+                  <History className="w-10 h-10 text-brand-navy/20 mx-auto mb-4" />
+                  <p className="text-brand-navy/40 text-sm font-bold">Belum ada riwayat kuis.</p>
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                  {[...rooms].sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map(room => (
+                    <div key={room.id} className="p-5 bg-brand-cream/30 rounded-3xl border border-brand-navy/5 hover:border-brand-orange/20 transition-all flex justify-between items-center group">
+                      <div>
+                        <h3 className="font-black text-brand-navy text-base mb-1">{room.quizTitle || "Kuis Tanpa Judul"}</h3>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest">Kode: {room.roomCode}</span>
+                          <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
+                            room.status === "finished" ? "bg-emerald-100 text-emerald-600" : "bg-brand-orange/10 text-brand-orange"
+                          }`}>
+                            {room.status === "finished" ? "Selesai" : "Aktif"}
+                          </span>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => fetchRoomLeaderboard(room.id)}
+                        className="p-3 bg-white text-brand-navy/40 hover:text-brand-orange rounded-2xl shadow-sm transition-all group-hover:scale-110"
+                        title="Lihat Peringkat"
+                      >
+                        <Trophy className="w-5 h-5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
         )}
+
+      {/* Room Leaderboard Modal */}
+      {viewingRoomId && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-2xl max-h-[80vh] rounded-[40px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-6 md:p-8 border-b border-brand-navy/5 flex justify-between items-center bg-brand-cream/30">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-brand-orange rounded-xl flex items-center justify-center shadow-lg shadow-brand-orange/20">
+                  <Trophy className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg md:text-xl font-black text-brand-navy tracking-tight">Hasil Kuis Ruangan</h2>
+                  <p className="text-[10px] font-bold text-brand-navy/40 uppercase tracking-widest">Peringkat Siswa di Ruangan Ini</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setViewingRoomId(null)}
+                className="p-2 hover:bg-brand-navy/5 rounded-full transition-colors text-brand-navy/40 hover:text-brand-navy"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
+              {isFetchingRoomLeaderboard ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="w-10 h-10 border-4 border-brand-orange border-t-transparent rounded-full animate-spin mb-4" />
+                  <p className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest animate-pulse">Memuat Peringkat...</p>
+                </div>
+              ) : viewingRoomLeaderboard.length === 0 ? (
+                <div className="text-center py-12">
+                  <Users className="w-12 h-12 text-brand-navy/10 mx-auto mb-4" />
+                  <p className="text-brand-navy/40 font-bold">Belum ada siswa yang menyelesaikan kuis ini.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {viewingRoomLeaderboard.map((entry, idx) => (
+                    <div key={entry.id} className="flex items-center justify-between p-4 bg-brand-cream/20 rounded-2xl border border-transparent">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs ${
+                          idx === 0 ? "bg-yellow-400 text-white" : 
+                          idx === 1 ? "bg-slate-300 text-white" : 
+                          idx === 2 ? "bg-amber-600 text-white" : 
+                          "bg-brand-navy/5 text-brand-navy/40"
+                        }`}>
+                          {idx + 1}
+                        </div>
+                        <Avatar avatarString={entry.avatar} size="sm" />
+                        <div>
+                          <p className="font-black text-brand-navy text-sm leading-tight">{entry.siswaName}</p>
+                          <p className="text-[10px] font-bold text-brand-navy/40 uppercase tracking-widest">{entry.studentClass || "-"}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-black text-brand-orange text-sm">{entry.score} XP</p>
+                        <p className="text-[8px] font-bold text-brand-navy/30 uppercase tracking-widest">
+                          {entry.status === "finished" ? "Selesai" : "Aktif"}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="p-6 border-t border-brand-navy/5 bg-brand-cream/10">
+              <button 
+                onClick={() => {
+                  const room = rooms.find(r => r.id === viewingRoomId);
+                  if (room) router.push(`/room/guru/${room.roomCode}`);
+                }}
+                className="w-full bg-brand-navy text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-brand-black transition-all"
+              >
+                Buka Detail Ruangan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Full Leaderboard Modal */}
       {isViewingLeaderboard && (
@@ -678,12 +952,83 @@ export default function GuruDashboard() {
         )}
 
         {mainTab === "materi" && (
-          <div className="flex flex-col items-center justify-center py-12 text-center animate-in fade-in zoom-in-95 duration-300">
-            <div className="w-20 h-20 bg-brand-cream/50 text-brand-navy/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
-              <BookOpen className="w-10 h-10" />
-            </div>
-            <h2 className="text-2xl font-black text-brand-navy mb-2 tracking-tight">Materi</h2>
-            <p className="text-brand-navy/60 text-sm font-medium">Materi pelajaran akan muncul di sini.</p>
+          <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+            <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5">
+              <div className="flex items-center justify-between mb-6 md:mb-8">
+                <h2 className="text-xl md:text-2xl font-black text-brand-navy flex items-center gap-3 tracking-tight">
+                  <BookOpen className="w-6 h-6 md:w-7 md:h-7 text-brand-orange" />
+                  Materi Pembelajaran
+                </h2>
+                <button 
+                  onClick={() => {
+                    setIsCreatingMaterial(true);
+                    setShowMaterialErrors(false);
+                  }}
+                  className="bg-brand-navy text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-brand-black transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> Tambah
+                </button>
+              </div>
+
+              {materials.length === 0 ? (
+                <div className="text-center py-12 md:py-16 bg-brand-cream/30 rounded-[32px] border-2 border-dashed border-brand-navy/10">
+                  <BookOpen className="w-10 h-10 md:w-12 md:h-12 text-brand-navy/20 mx-auto mb-4" />
+                  <p className="text-brand-navy/40 text-sm font-bold">Belum ada materi. Tambahkan sekarang!</p>
+                </div>
+              ) : (
+                <div className="relative py-10">
+                  {/* Duolingo-like path line */}
+                  <div className="absolute left-1/2 top-0 bottom-0 w-3 bg-brand-cream -translate-x-1/2 rounded-full hidden md:block" />
+                  
+                  <div className="space-y-12 relative z-10">
+                    {materials.map((mat, idx) => {
+                      // Zig-zag logic: 0 -> center-left, 1 -> center-right, 2 -> center
+                      const positions = ["md:-translate-x-24", "md:translate-x-24", "md:translate-x-0"];
+                      const posClass = positions[idx % 3];
+                      
+                      return (
+                        <div key={mat.id} className={`flex flex-col items-center transition-all ${posClass}`}>
+                          <div className="relative group">
+                            <button 
+                              onClick={() => setViewingMaterial(mat)}
+                              className="w-20 h-20 md:w-24 md:h-24 rounded-[32px] bg-white border-4 border-brand-cream flex items-center justify-center shadow-xl hover:scale-110 hover:border-brand-orange transition-all relative z-20 group"
+                            >
+                              <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-brand-navy flex items-center justify-center text-white font-black text-xl md:text-2xl group-hover:bg-brand-orange transition-colors">
+                                {idx + 1}
+                              </div>
+                              
+                              {/* Tooltip-like label */}
+                              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-brand-navy text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-xl">
+                                {mat.title}
+                              </div>
+                            </button>
+                            
+                            {/* Action buttons on hover */}
+                            <div className="absolute -right-16 top-1/2 -translate-y-1/2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); deleteMaterial(mat.id); }}
+                                className={`p-2 rounded-xl transition-all ${
+                                  deletingMaterialId === mat.id 
+                                    ? "bg-red-500 text-white" 
+                                    : "bg-white text-red-500 shadow-lg hover:bg-red-50"
+                                }`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-4 text-center max-w-[200px]">
+                            <h3 className="font-black text-brand-navy text-sm mb-1 truncate">{mat.title}</h3>
+                            <p className="text-[10px] font-bold text-brand-navy/40 uppercase tracking-widest">{mat.subject}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </section>
           </div>
         )}
       </div>
@@ -763,6 +1108,432 @@ export default function GuruDashboard() {
                 <Play className="w-6 h-6 fill-current" />
                 Buka Kelas Sekarang
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Quiz Modal */}
+      {isCreatingManualQuiz && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-5xl max-h-[95vh] rounded-[40px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-6 md:p-8 border-b border-brand-navy/5 flex justify-between items-center bg-brand-cream/30">
+              <div>
+                <h2 className="text-xl md:text-2xl font-black text-brand-navy tracking-tight">Buat Kuis Manual</h2>
+                <p className="text-brand-navy/40 text-[10px] font-black uppercase tracking-widest">Tambah soal satu per satu</p>
+              </div>
+              <button 
+                onClick={() => setIsCreatingManualQuiz(false)}
+                className="p-2 hover:bg-brand-navy/5 rounded-full transition-colors text-brand-navy/40 hover:text-brand-navy"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col md:flex-row gap-8">
+              {/* Left Column: Quiz Meta & Question List */}
+              <div className="w-full md:w-1/3 flex flex-col gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">Judul Kuis</label>
+                    <input 
+                      type="text" 
+                      value={manualQuizTitle}
+                      onChange={(e) => setManualQuizTitle(e.target.value)}
+                      placeholder="Judul..."
+                      className="w-full p-3 bg-brand-cream/50 border-2 border-transparent rounded-xl focus:border-brand-orange outline-none font-bold text-brand-navy text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">Mode Permainan</label>
+                    <select 
+                      value={manualQuizType}
+                      onChange={(e) => {
+                        const type = e.target.value as any;
+                        setManualQuizType(type);
+                        if (type === "true_false") {
+                          setCurrentManualOptions(["Benar", "Salah"]);
+                          setCurrentManualCorrectIdx(0);
+                        } else {
+                          setCurrentManualOptions(["", "", "", ""]);
+                          setCurrentManualCorrectIdx(0);
+                        }
+                      }}
+                      className="w-full p-3 bg-brand-cream/50 border-2 border-transparent rounded-xl focus:border-brand-orange outline-none font-bold text-brand-navy text-sm appearance-none cursor-pointer"
+                    >
+                      <option value="multiple_choice">Pilihan Ganda</option>
+                      <option value="true_false">Benar / Salah</option>
+                      <option value="duck_hunt">Berburu Bebek</option>
+                      <option value="hidden_word">Tebak Kata Tersembunyi</option>
+                    </select>
+                  </div>
+                  {manualQuizType === "hidden_word" && (
+                    <div>
+                      <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">Kata Rahasia</label>
+                      <input 
+                        type="text" 
+                        value={manualHiddenWord}
+                        onChange={(e) => setManualHiddenWord(e.target.value.toUpperCase().replace(/\s/g, ''))}
+                        placeholder="KATA (5-10 huruf)"
+                        maxLength={10}
+                        className="w-full p-3 bg-brand-cream/50 border-2 border-transparent rounded-xl focus:border-brand-orange outline-none font-bold text-brand-navy text-sm uppercase"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 overflow-y-auto bg-brand-cream/30 rounded-2xl p-4 border border-brand-navy/5 min-h-[200px]">
+                  <h3 className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest mb-3">Daftar Soal ({manualQuestions.length})</h3>
+                  <div className="space-y-2">
+                    {manualQuestions.map((q, idx) => (
+                      <div key={idx} className="p-3 bg-white rounded-xl border border-brand-navy/5 text-xs font-bold text-brand-navy flex justify-between items-center group">
+                        <span className="truncate pr-2">{idx + 1}. {q.question}</span>
+                        <button onClick={() => {
+                          const newQ = [...manualQuestions];
+                          newQ.splice(idx, 1);
+                          setManualQuestions(newQ);
+                        }} className="text-red-500 opacity-50 hover:opacity-100 hover:bg-red-50 p-1.5 rounded-lg transition-all">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                    {manualQuestions.length === 0 && (
+                      <p className="text-xs text-brand-navy/40 text-center py-8">Belum ada soal</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Add Question Form */}
+              <div className="w-full md:w-2/3 bg-brand-cream/30 p-6 rounded-3xl border border-brand-navy/5 flex flex-col">
+                <h3 className="text-lg font-black text-brand-navy mb-4">Tambah Soal Baru</h3>
+                <div className="space-y-4 flex-1">
+                  <div>
+                    <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">Pertanyaan</label>
+                    <textarea 
+                      value={currentManualQuestion}
+                      onChange={(e) => setCurrentManualQuestion(e.target.value)}
+                      placeholder="Ketik pertanyaan di sini..."
+                      className="w-full p-4 bg-white border-2 border-transparent rounded-2xl focus:border-brand-orange outline-none font-bold text-brand-navy text-sm resize-none h-24"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1 mb-2 block">Pilihan Jawaban & Kunci</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {currentManualOptions.map((opt, idx) => (
+                        <div key={idx} className="flex items-center gap-3">
+                          <button 
+                            type="button"
+                            onClick={() => setCurrentManualCorrectIdx(idx)}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border-2 transition-all ${
+                              currentManualCorrectIdx === idx 
+                                ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20" 
+                                : "bg-white border-brand-navy/20 text-transparent hover:border-emerald-500"
+                            }`}
+                          >
+                            ✓
+                          </button>
+                          <input 
+                            type="text"
+                            value={opt}
+                            disabled={manualQuizType === "true_false"}
+                            onChange={(e) => {
+                              const newOpts = [...currentManualOptions];
+                              newOpts[idx] = e.target.value;
+                              setCurrentManualOptions(newOpts);
+                            }}
+                            placeholder={`Pilihan ${String.fromCharCode(65 + idx)}`}
+                            className={`flex-1 p-3 bg-white border-2 border-transparent rounded-xl focus:border-brand-orange outline-none font-bold text-sm ${
+                              currentManualCorrectIdx === idx ? "text-emerald-700 border-emerald-200 bg-emerald-50" : "text-brand-navy"
+                            } ${manualQuizType === "true_false" ? "opacity-70 cursor-not-allowed" : ""}`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={() => {
+                    if (!currentManualQuestion.trim()) return alert("Pertanyaan tidak boleh kosong");
+                    if (currentManualOptions.some(o => !o.trim())) return alert("Semua pilihan harus diisi");
+                    
+                    setManualQuestions([...manualQuestions, {
+                      question: currentManualQuestion,
+                      options: [...currentManualOptions],
+                      correctAnswerIndex: currentManualCorrectIdx
+                    }]);
+                    
+                    setCurrentManualQuestion("");
+                    if (manualQuizType !== "true_false") {
+                      setCurrentManualOptions(["", "", "", ""]);
+                    }
+                    setCurrentManualCorrectIdx(0);
+                  }}
+                  className="mt-6 w-full bg-brand-navy/5 text-brand-navy py-4 rounded-2xl font-black text-sm hover:bg-brand-navy/10 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-5 h-5" /> Tambahkan ke Daftar Soal
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 md:p-8 border-t border-brand-navy/5 bg-white flex justify-end gap-4">
+              <button 
+                onClick={() => setIsCreatingManualQuiz(false)}
+                className="px-6 py-4 rounded-2xl font-black text-sm text-brand-navy/40 hover:bg-brand-cream transition-colors"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={async () => {
+                  if (!manualQuizTitle.trim()) return alert("Judul kuis harus diisi");
+                  if (manualQuestions.length === 0) return alert("Tambahkan minimal 1 soal");
+                  if (manualQuizType === "hidden_word" && (!manualHiddenWord || manualHiddenWord.length < 5)) return alert("Kata rahasia harus 5-10 huruf");
+                  
+                  const quizData: any = {
+                    guruId: userData.uid,
+                    subject: userData.subject,
+                    title: manualQuizTitle,
+                    quizType: manualQuizType,
+                    questions: manualQuestions,
+                    createdAt: new Date()
+                  };
+                  if (manualQuizType === "hidden_word") {
+                    quizData.hiddenWord = manualHiddenWord;
+                  }
+                  
+                  try {
+                    await addDoc(collection(db, "quizzes"), quizData);
+                    await fetchQuizzes();
+                    setIsCreatingManualQuiz(false);
+                    // Reset state
+                    setManualQuizTitle("");
+                    setManualQuestions([]);
+                    setManualHiddenWord("");
+                    setCurrentManualQuestion("");
+                    setCurrentManualOptions(["", "", "", ""]);
+                    setCurrentManualCorrectIdx(0);
+                  } catch (e: any) {
+                    alert("Gagal menyimpan kuis: " + e.message);
+                  }
+                }}
+                className="bg-brand-orange text-white px-8 py-4 rounded-2xl font-black text-sm hover:bg-brand-orange/90 shadow-xl shadow-brand-orange/20 transition-all active:scale-95"
+              >
+                Simpan Kuis
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Material Modal */}
+      {isCreatingMaterial && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-2xl max-h-[90vh] rounded-[40px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-6 md:p-8 border-b border-brand-navy/5 flex justify-between items-center bg-brand-cream/30">
+              <div>
+                <h2 className="text-xl md:text-2xl font-black text-brand-navy tracking-tight">Tambah Materi Baru</h2>
+                <p className="text-brand-navy/40 text-[10px] font-black uppercase tracking-widest">Mata Pelajaran: {userData.subject}</p>
+              </div>
+              <button 
+                onClick={() => setIsCreatingMaterial(false)}
+                className="p-2 hover:bg-brand-navy/5 rounded-full transition-colors text-brand-navy/40 hover:text-brand-navy"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+              <div>
+                <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">Judul Materi</label>
+                <input 
+                  type="text" 
+                  value={materialTitle}
+                  onChange={(e) => setMaterialTitle(e.target.value)}
+                  placeholder="Contoh: Pengenalan Algoritma"
+                  className={`w-full p-4 bg-brand-cream/50 border-2 rounded-2xl focus:border-brand-orange outline-none font-bold text-brand-navy text-sm mt-2 transition-all ${
+                    showMaterialErrors && !materialTitle.trim() ? "border-red-500 bg-red-50" : "border-transparent"
+                  }`}
+                />
+              </div>
+              
+              <div>
+                <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">Deskripsi Singkat</label>
+                <input 
+                  type="text" 
+                  value={materialDesc}
+                  onChange={(e) => setMaterialDesc(e.target.value)}
+                  placeholder="Penjelasan singkat tentang materi ini..."
+                  className={`w-full p-4 bg-brand-cream/50 border-2 rounded-2xl focus:border-brand-orange outline-none font-bold text-brand-navy text-sm mt-2 transition-all ${
+                    showMaterialErrors && !materialDesc.trim() ? "border-red-500 bg-red-50" : "border-transparent"
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1 mb-2 block">Tipe Materi</label>
+                <div className="flex gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setMaterialType("text")}
+                    className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+                      materialType === "text" 
+                        ? "bg-brand-navy text-white shadow-lg shadow-brand-navy/20" 
+                        : "bg-brand-cream text-brand-navy/40 hover:bg-brand-navy/10"
+                    }`}
+                  >
+                    Teks Manual
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMaterialType("link")}
+                    className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+                      materialType === "link" 
+                        ? "bg-brand-orange text-white shadow-lg shadow-brand-orange/20" 
+                        : "bg-brand-cream text-brand-navy/40 hover:bg-brand-orange/10"
+                    }`}
+                  >
+                    Link Google Drive
+                  </button>
+                </div>
+              </div>
+
+              {materialType === "text" ? (
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">Poin-poin Materi (Roadmap)</label>
+                  <div className="space-y-3">
+                    {materialPoints.map((point, idx) => (
+                      <div key={idx} className="flex gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-brand-navy text-white flex items-center justify-center font-black text-xs flex-shrink-0">
+                          {idx + 1}
+                        </div>
+                        <textarea 
+                          value={point}
+                          onChange={(e) => {
+                            const newPoints = [...materialPoints];
+                            newPoints[idx] = e.target.value;
+                            setMaterialPoints(newPoints);
+                          }}
+                          placeholder={`Ketik poin materi ke-${idx + 1}...`}
+                          className={`flex-1 p-4 bg-brand-cream/50 border-2 rounded-2xl focus:border-brand-orange outline-none font-medium text-brand-navy text-sm min-h-[80px] resize-none transition-all ${
+                            showMaterialErrors && !point.trim() ? "border-red-500 bg-red-50" : "border-transparent"
+                          }`}
+                        />
+                        <button 
+                          onClick={() => {
+                            const newPoints = [...materialPoints];
+                            newPoints.splice(idx, 1);
+                            setMaterialPoints(newPoints);
+                          }}
+                          disabled={materialPoints.length === 1}
+                          className="p-3 text-red-500 hover:bg-red-50 rounded-xl disabled:opacity-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button 
+                    onClick={() => setMaterialPoints([...materialPoints, ""])}
+                    className="w-full py-3 border-2 border-dashed border-brand-navy/10 rounded-2xl text-brand-navy/40 font-black text-[10px] uppercase tracking-widest hover:border-brand-orange hover:text-brand-orange transition-all"
+                  >
+                    + Tambah Poin Materi
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">Link Google Drive / Eksternal</label>
+                  <input 
+                    type="url" 
+                    value={materialLink}
+                    onChange={(e) => setMaterialLink(e.target.value)}
+                    placeholder="Tempel link Google Drive di sini..."
+                    className={`w-full p-4 bg-brand-cream/50 border-2 rounded-2xl focus:border-brand-orange outline-none font-bold text-brand-navy text-sm mt-2 transition-all ${
+                      showMaterialErrors && !materialLink.trim() ? "border-red-500 bg-red-50" : "border-transparent"
+                    }`}
+                  />
+                  <p className="mt-2 text-[10px] text-brand-navy/40 font-bold italic">
+                    * Pastikan akses link sudah diatur ke &quot;Siapa saja yang memiliki link&quot; di Google Drive.
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-6 md:p-8 border-t border-brand-navy/5 bg-white">
+              <button 
+                onClick={handleCreateMaterial}
+                disabled={isUploadingMaterial}
+                className="w-full bg-brand-orange text-white py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 hover:bg-brand-orange/90 shadow-xl shadow-brand-orange/20 transition-all active:scale-95 disabled:opacity-50"
+              >
+                {isUploadingMaterial ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Menyimpan...
+                  </>
+                ) : (
+                  "Simpan Materi"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Material Modal */}
+      {viewingMaterial && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-3xl max-h-[90vh] rounded-[40px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-6 md:p-8 border-b border-brand-navy/5 flex justify-between items-center bg-brand-cream/30">
+              <div>
+                <span className="inline-block px-2 py-1 bg-brand-orange/10 text-brand-orange text-[10px] font-black uppercase tracking-widest rounded-md mb-2">
+                  {viewingMaterial.subject}
+                </span>
+                <h2 className="text-xl md:text-2xl font-black text-brand-navy tracking-tight">{viewingMaterial.title}</h2>
+              </div>
+              <button 
+                onClick={() => setViewingMaterial(null)}
+                className="p-2 hover:bg-brand-navy/5 rounded-full transition-colors text-brand-navy/40 hover:text-brand-navy"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 md:p-8">
+              {viewingMaterial.points && viewingMaterial.points.length > 0 ? (
+                <div className="space-y-8 relative py-4">
+                  <div className="absolute left-6 top-0 bottom-0 w-1 bg-brand-cream rounded-full" />
+                  {viewingMaterial.points.map((point, idx) => (
+                    <div key={idx} className="flex gap-6 relative z-10 animate-in slide-in-from-left duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+                      <div className="w-12 h-12 rounded-2xl bg-brand-navy text-white flex items-center justify-center font-black text-lg shadow-lg shadow-brand-navy/20 flex-shrink-0">
+                        {idx + 1}
+                      </div>
+                      <div className="flex-1 p-6 bg-brand-cream/30 rounded-3xl border border-brand-navy/5 font-medium text-brand-navy leading-relaxed">
+                        {point}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : viewingMaterial.content ? (
+                <div className="prose prose-sm md:prose-base max-w-none text-brand-navy/80 whitespace-pre-wrap">
+                  {viewingMaterial.content}
+                </div>
+              ) : viewingMaterial.fileUrl ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <FileText className="w-16 h-16 text-brand-orange mb-4" />
+                  <p className="text-brand-navy font-bold mb-6">Materi ini berupa file dokumen.</p>
+                  <a 
+                    href={viewingMaterial.fileUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="bg-brand-navy text-white px-6 py-3 rounded-xl font-black uppercase tracking-widest hover:bg-brand-black transition-colors"
+                  >
+                    Buka File {viewingMaterial.fileName}
+                  </a>
+                </div>
+              ) : (
+                <p className="text-center text-brand-navy/40">Konten tidak tersedia.</p>
+              )}
             </div>
           </div>
         </div>
