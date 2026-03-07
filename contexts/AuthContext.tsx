@@ -29,7 +29,7 @@ interface AuthContextType {
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
-  setRole: (role: Role, subject?: string) => Promise<void>;
+  setRole: (role: Role, subjectOrClass?: string) => Promise<void>;
   updateProfile: (data: Partial<UserData>) => Promise<void>;
   buyItem: (itemId: string, price: number) => Promise<void>;
 }
@@ -115,12 +115,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const setRole = async (role: Role, subject?: string) => {
+  const setRole = async (role: Role, subjectOrClass?: string) => {
     if (!user) return;
     const userDocRef = doc(db, "users", user.uid);
     const updatedData: Partial<UserData> = { role };
-    if (role === "Guru" && subject) {
-      updatedData.subject = subject;
+    if (role === "Guru" && subjectOrClass) {
+      updatedData.subject = subjectOrClass;
+    } else if (role === "Siswa" && subjectOrClass) {
+      updatedData.studentClass = subjectOrClass;
     }
     await setDoc(userDocRef, updatedData, { merge: true });
     setUserData((prev) => prev ? { ...prev, ...updatedData } : null);

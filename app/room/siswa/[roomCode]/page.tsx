@@ -40,6 +40,7 @@ export default function SiswaRoom() {
   const [hiddenWordGuess, setHiddenWordGuess] = useState("");
   const [hiddenWordGuessed, setHiddenWordGuessed] = useState(false);
   const [hiddenWordResult, setHiddenWordResult] = useState<"correct" | "incorrect" | null>(null);
+  const [isCheating, setIsCheating] = useState(false);
   
   // Item States
   const [inventory, setInventory] = useState<Record<string, number>>({});
@@ -59,6 +60,29 @@ export default function SiswaRoom() {
     audio.volume = 0.3;
     audio.play().catch(() => {}); // Ignore if blocked by browser
   };
+
+  useEffect(() => {
+    if (!room || room.status !== "playing" || submitted) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        setIsCheating(true);
+      }
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [room, submitted]);
 
   useEffect(() => {
     if (!roomCode) return;
@@ -819,6 +843,37 @@ export default function SiswaRoom() {
               )}
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isCheating && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="absolute inset-0 bg-brand-navy/90 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              className="relative w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden text-center p-10 border-4 border-red-500"
+            >
+              <div className="w-24 h-24 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Zap className="w-12 h-12" />
+              </div>
+              <h2 className="text-3xl font-black text-brand-navy tracking-tight italic font-serif mb-4">Dilarang Mencontek!</h2>
+              <p className="text-brand-navy/60 font-medium mb-8">
+                Sistem mendeteksi Anda meninggalkan halaman kuis. Harap kerjakan kuis dengan jujur dan jangan membuka tab atau aplikasi lain.
+              </p>
+              <button 
+                onClick={() => setIsCheating(false)}
+                className="w-full bg-red-500 text-white font-black py-5 rounded-3xl hover:bg-red-600 transition-all active:scale-95 uppercase tracking-widest text-sm"
+              >
+                Saya Mengerti
+              </button>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

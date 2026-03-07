@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
-import { LogOut, Play, Trophy, Star, Zap, History, Users, Diamond, ShoppingBag } from "lucide-react";
+import { LogOut, Play, Trophy, Star, Zap, History, Users, Diamond, ShoppingBag, Home, FileText, BookOpen } from "lucide-react";
 import { collection, query, orderBy, getDocs, doc, updateDoc, limit, getCountFromServer, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import StudentOnboardingModal from "@/components/StudentOnboardingModal";
@@ -18,7 +18,8 @@ export default function SiswaDashboard() {
   const [rank, setRank] = useState<number | string>("-");
   const [quizHistory, setQuizHistory] = useState<any[]>([]);
   const [globalLeaderboard, setGlobalLeaderboard] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<"join" | "history" | "leaderboard" | "shop">("join");
+  const [mainTab, setMainTab] = useState<"beranda" | "kuis" | "tugas" | "materi">("beranda");
+  const [berandaTab, setBerandaTab] = useState<"history" | "leaderboard" | "shop">("history");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -79,7 +80,7 @@ export default function SiswaDashboard() {
   if (!userData) return null;
 
   return (
-    <div className="min-h-screen bg-brand-cream flex flex-col items-center">
+    <div className="min-h-screen bg-brand-cream flex flex-col items-center pb-24">
       <StudentOnboardingModal />
       <div className="w-full max-w-md md:max-w-2xl px-4 py-6 md:py-10">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 bg-white p-6 rounded-[32px] shadow-sm gap-4 border border-brand-navy/5">
@@ -143,110 +144,78 @@ export default function SiswaDashboard() {
           </div>
         </div>
 
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 no-scrollbar">
-          <button 
-            onClick={() => setActiveTab("join")}
-            className={`flex-1 min-w-[80px] py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === "join" ? "bg-brand-navy text-white shadow-lg shadow-brand-navy/20" : "bg-white text-brand-navy/40 hover:bg-brand-navy/5"}`}
-          >
-            Gabung
-          </button>
-          <button 
-            onClick={() => setActiveTab("history")}
-            className={`flex-1 min-w-[80px] py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === "history" ? "bg-brand-navy text-white shadow-lg shadow-brand-navy/20" : "bg-white text-brand-navy/40 hover:bg-brand-navy/5"}`}
-          >
-            Riwayat
-          </button>
-          <button 
-            onClick={() => setActiveTab("leaderboard")}
-            className={`flex-1 min-w-[80px] py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === "leaderboard" ? "bg-brand-navy text-white shadow-lg shadow-brand-navy/20" : "bg-white text-brand-navy/40 hover:bg-brand-navy/5"}`}
-          >
-            Global
-          </button>
-          <button 
-            onClick={() => setActiveTab("shop")}
-            className={`flex-1 min-w-[80px] py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === "shop" ? "bg-brand-navy text-white shadow-lg shadow-brand-navy/20" : "bg-white text-brand-navy/40 hover:bg-brand-navy/5"}`}
-          >
-            Toko
-          </button>
-        </div>
-
-        <div className="flex flex-col items-center justify-center py-4">
-          {activeTab === "join" && (
-            <div className="bg-white p-8 md:p-10 rounded-[40px] shadow-xl shadow-brand-navy/5 w-full text-center border border-brand-navy/5 animate-in fade-in zoom-in-95 duration-300">
-              <div className="w-20 h-20 bg-brand-navy text-white rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-brand-navy/20 rotate-3 hover:rotate-0 transition-transform cursor-pointer">
-                <Play className="w-10 h-10 ml-1" />
-              </div>
-              <h2 className="text-2xl font-black text-brand-navy mb-2 tracking-tight">Gabung Kuis</h2>
-              <p className="text-brand-navy/60 text-sm mb-8 leading-relaxed font-medium">Masukkan 6 digit kode ruangan yang diberikan oleh guru Anda untuk memulai petualangan!</p>
-              
-              <form onSubmit={joinRoom} className="space-y-6">
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={roomCode}
-                  onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                  placeholder="000000"
-                  className="w-full text-center text-4xl md:text-5xl font-mono tracking-[0.4em] p-5 md:p-6 bg-brand-cream/50 border-2 border-transparent rounded-3xl focus:border-brand-orange focus:bg-white focus:ring-8 focus:ring-brand-orange/5 outline-none transition-all uppercase placeholder:text-brand-navy/20 text-brand-navy"
-                />
-                <button
-                  type="submit"
-                  disabled={roomCode.length !== 6}
-                  className="w-full bg-brand-navy text-white font-black text-lg py-5 rounded-3xl hover:bg-brand-black hover:shadow-xl hover:shadow-brand-navy/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
-                >
-                  Masuk Ruangan
-                </button>
-              </form>
+        {mainTab === "beranda" && (
+          <>
+            <div className="flex gap-2 mb-6 overflow-x-auto pb-2 no-scrollbar">
+              <button 
+                onClick={() => setBerandaTab("history")}
+                className={`flex-1 min-w-[80px] py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${berandaTab === "history" ? "bg-brand-navy text-white shadow-lg shadow-brand-navy/20" : "bg-white text-brand-navy/40 hover:bg-brand-navy/5"}`}
+              >
+                Riwayat
+              </button>
+              <button 
+                onClick={() => setBerandaTab("leaderboard")}
+                className={`flex-1 min-w-[80px] py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${berandaTab === "leaderboard" ? "bg-brand-navy text-white shadow-lg shadow-brand-navy/20" : "bg-white text-brand-navy/40 hover:bg-brand-navy/5"}`}
+              >
+                Global
+              </button>
+              <button 
+                onClick={() => setBerandaTab("shop")}
+                className={`flex-1 min-w-[80px] py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${berandaTab === "shop" ? "bg-brand-navy text-white shadow-lg shadow-brand-navy/20" : "bg-white text-brand-navy/40 hover:bg-brand-navy/5"}`}
+              >
+                Toko
+              </button>
             </div>
-          )}
 
-          {activeTab === "history" && (
-            <div className="bg-white p-6 md:p-8 rounded-[40px] shadow-xl shadow-brand-navy/5 w-full border border-brand-navy/5 animate-in fade-in slide-in-from-bottom-4 duration-300">
-              <div className="flex items-center gap-3 mb-6">
-                <History className="w-6 h-6 text-brand-orange" />
-                <h2 className="text-xl font-black text-brand-navy tracking-tight">Riwayat Kuis</h2>
-              </div>
-              
-              {quizHistory.length === 0 ? (
-                <div className="text-center py-12 bg-brand-cream/30 rounded-3xl border-2 border-dashed border-brand-navy/5">
-                  <p className="text-brand-navy/40 font-bold text-sm">Belum ada riwayat kuis.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {quizHistory.map((item) => (
-                    <div key={item.id} className="p-4 bg-brand-cream/50 rounded-2xl border border-transparent hover:border-brand-orange/20 transition-all flex justify-between items-center">
-                      <div>
-                        <h3 className="font-black text-brand-navy text-sm mb-1">{item.quizTitle}</h3>
-                        <p className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest">
-                          {item.completedAt?.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })} • Room: {item.roomCode}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-black text-brand-orange">+{item.score}</div>
-                        <div className="text-[8px] text-brand-navy/40 font-black uppercase tracking-widest">XP</div>
-                      </div>
+            <div className="flex flex-col items-center justify-center py-4">
+              {berandaTab === "history" && (
+                <div className="bg-white p-6 md:p-8 rounded-[40px] shadow-xl shadow-brand-navy/5 w-full border border-brand-navy/5 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                  <div className="flex items-center gap-3 mb-6">
+                    <History className="w-6 h-6 text-brand-orange" />
+                    <h2 className="text-xl font-black text-brand-navy tracking-tight">Riwayat Kuis</h2>
+                  </div>
+                  
+                  {quizHistory.length === 0 ? (
+                    <div className="text-center py-12 bg-brand-cream/30 rounded-3xl border-2 border-dashed border-brand-navy/5">
+                      <p className="text-brand-navy/40 font-bold text-sm">Belum ada riwayat kuis.</p>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="space-y-4">
+                      {quizHistory.map((item) => (
+                        <div key={item.id} className="p-4 bg-brand-cream/50 rounded-2xl border border-transparent hover:border-brand-orange/20 transition-all flex justify-between items-center">
+                          <div>
+                            <h3 className="font-black text-brand-navy text-sm mb-1">{item.quizTitle}</h3>
+                            <p className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest">
+                              {item.completedAt?.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })} • Room: {item.roomCode}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-black text-brand-orange">+{item.score}</div>
+                            <div className="text-[8px] text-brand-navy/40 font-black uppercase tracking-widest">XP</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
 
-          {activeTab === "shop" && (
-            <div className="bg-white p-6 md:p-8 rounded-[40px] shadow-xl shadow-brand-navy/5 w-full border border-brand-navy/5 animate-in fade-in slide-in-from-bottom-4 duration-300">
-              <Shop />
-            </div>
-          )}
+              {berandaTab === "shop" && (
+                <div className="bg-white p-6 md:p-8 rounded-[40px] shadow-xl shadow-brand-navy/5 w-full border border-brand-navy/5 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                  <Shop />
+                </div>
+              )}
 
-          {activeTab === "leaderboard" && (
-            <div className="bg-white p-6 md:p-8 rounded-[40px] shadow-xl shadow-brand-navy/5 w-full border border-brand-navy/5 animate-in fade-in slide-in-from-bottom-4 duration-300">
-              <div className="flex items-center gap-3 mb-6">
-                <Users className="w-6 h-6 text-brand-orange" />
-                <h2 className="text-xl font-black text-brand-navy tracking-tight">Peringkat Global</h2>
-              </div>
+              {berandaTab === "leaderboard" && (
+                <div className="bg-white p-6 md:p-8 rounded-[40px] shadow-xl shadow-brand-navy/5 w-full border border-brand-navy/5 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                  <div className="flex items-center gap-3 mb-6">
+                    <Users className="w-6 h-6 text-brand-orange" />
+                    <h2 className="text-xl font-black text-brand-navy tracking-tight">Peringkat Global</h2>
+                  </div>
 
-              {/* Podium Section */}
-              {globalLeaderboard.length > 0 && (
-                <div className="flex items-end justify-center gap-2 mb-10 mt-4 h-48">
+                  {/* Podium Section */}
+                  {globalLeaderboard.length > 0 && (
+                    <div className="flex items-end justify-center gap-2 mb-10 mt-4 h-48">
                   {/* 2nd Place */}
                   <div className="flex flex-col items-center flex-1 max-w-[100px]">
                     {globalLeaderboard[1] ? (
@@ -344,8 +313,80 @@ export default function SiswaDashboard() {
               </div>
             </div>
           )}
-        </div>
+          </div>
+          </>
+        )}
+
+        {mainTab === "kuis" && (
+          <div className="flex flex-col items-center justify-center py-4">
+            <div className="bg-white p-8 md:p-10 rounded-[40px] shadow-xl shadow-brand-navy/5 w-full text-center border border-brand-navy/5 animate-in fade-in zoom-in-95 duration-300">
+              <div className="w-20 h-20 bg-brand-navy text-white rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-brand-navy/20 rotate-3 hover:rotate-0 transition-transform cursor-pointer">
+                <Play className="w-10 h-10 ml-1" />
+              </div>
+              <h2 className="text-2xl font-black text-brand-navy mb-2 tracking-tight">Gabung Kuis</h2>
+              <p className="text-brand-navy/60 text-sm mb-8 leading-relaxed font-medium">Masukkan 6 digit kode ruangan yang diberikan oleh guru Anda untuk memulai petualangan!</p>
+              
+              <form onSubmit={joinRoom} className="space-y-6">
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={roomCode}
+                  onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                  placeholder="000000"
+                  className="w-full text-center text-4xl md:text-5xl font-mono tracking-[0.4em] p-5 md:p-6 bg-brand-cream/50 border-2 border-transparent rounded-3xl focus:border-brand-orange focus:bg-white focus:ring-8 focus:ring-brand-orange/5 outline-none transition-all uppercase placeholder:text-brand-navy/20 text-brand-navy"
+                />
+                <button
+                  type="submit"
+                  disabled={roomCode.length !== 6}
+                  className="w-full bg-brand-navy text-white font-black text-lg py-5 rounded-3xl hover:bg-brand-black hover:shadow-xl hover:shadow-brand-navy/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                >
+                  Masuk Ruangan
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {mainTab === "tugas" && (
+          <div className="flex flex-col items-center justify-center py-12 text-center animate-in fade-in zoom-in-95 duration-300">
+            <div className="w-20 h-20 bg-brand-cream/50 text-brand-navy/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
+              <FileText className="w-10 h-10" />
+            </div>
+            <h2 className="text-2xl font-black text-brand-navy mb-2 tracking-tight">Tugas</h2>
+            <p className="text-brand-navy/60 text-sm font-medium">Belum ada tugas yang diberikan.</p>
+          </div>
+        )}
+
+        {mainTab === "materi" && (
+          <div className="flex flex-col items-center justify-center py-12 text-center animate-in fade-in zoom-in-95 duration-300">
+            <div className="w-20 h-20 bg-brand-cream/50 text-brand-navy/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
+              <BookOpen className="w-10 h-10" />
+            </div>
+            <h2 className="text-2xl font-black text-brand-navy mb-2 tracking-tight">Materi</h2>
+            <p className="text-brand-navy/60 text-sm font-medium">Materi pelajaran akan muncul di sini.</p>
+          </div>
+        )}
       </div>
+
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-brand-navy/10 flex justify-around items-center p-4 pb-safe z-50 md:hidden shadow-[0_-10px_40px_rgba(0,0,0,0.05)] rounded-t-3xl">
+        <button onClick={() => setMainTab("beranda")} className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "beranda" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}>
+          <Home className={`w-6 h-6 ${mainTab === "beranda" ? "fill-current" : ""}`} />
+          <span className="text-[10px] font-black uppercase tracking-widest">Beranda</span>
+        </button>
+        <button onClick={() => setMainTab("kuis")} className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "kuis" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}>
+          <Play className={`w-6 h-6 ${mainTab === "kuis" ? "fill-current" : ""}`} />
+          <span className="text-[10px] font-black uppercase tracking-widest">Kuis</span>
+        </button>
+        <button onClick={() => setMainTab("tugas")} className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "tugas" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}>
+          <FileText className={`w-6 h-6 ${mainTab === "tugas" ? "fill-current" : ""}`} />
+          <span className="text-[10px] font-black uppercase tracking-widest">Tugas</span>
+        </button>
+        <button onClick={() => setMainTab("materi")} className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "materi" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}>
+          <BookOpen className={`w-6 h-6 ${mainTab === "materi" ? "fill-current" : ""}`} />
+          <span className="text-[10px] font-black uppercase tracking-widest">Materi</span>
+        </button>
+      </nav>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { collection, addDoc, query, where, getDocs, orderBy, deleteDoc, doc, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, Play, History, LogOut, Sparkles, BookOpen, Trash2, X, Eye, Trophy, Search, Filter } from "lucide-react";
+import { Plus, Play, History, LogOut, Sparkles, BookOpen, Trash2, X, Eye, Trophy, Search, Filter, Home, FileText } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { GoogleGenAI, Type } from "@google/genai";
 import Avatar from "@/components/Avatar";
@@ -44,6 +44,7 @@ export default function GuruDashboard() {
   const [leaderboardFilter, setLeaderboardFilter] = useState("");
   const [fullLeaderboard, setFullLeaderboard] = useState<any[]>([]);
   const [isFetchingLeaderboard, setIsFetchingLeaderboard] = useState(false);
+  const [mainTab, setMainTab] = useState<"beranda" | "kuis" | "tugas" | "materi">("beranda");
 
   const fetchQuizzes = useCallback(async () => {
     if (!userData?.uid) return;
@@ -333,8 +334,8 @@ export default function GuruDashboard() {
           </button>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 space-y-6">
+        {mainTab === "kuis" && (
+          <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
             {/* AI Quiz Generator */}
             <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5 relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-brand-orange/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-brand-orange/10 transition-colors" />
@@ -424,27 +425,8 @@ export default function GuruDashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {quizzes.map(quiz => (
                     <div key={quiz.id} className="group p-5 md:p-6 bg-white border-2 border-brand-navy/5 rounded-3xl hover:border-brand-orange hover:shadow-xl hover:shadow-brand-orange/5 transition-all relative">
-                        <button 
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteQuiz(quiz.id);
-                          }}
-                          className={`absolute top-4 right-4 p-2 rounded-xl transition-all z-20 ${
-                            deletingQuizId === quiz.id 
-                              ? "bg-red-500 text-white shadow-lg shadow-red-500/20 scale-110" 
-                              : "text-brand-navy/10 hover:text-red-500"
-                          }`}
-                          title={deletingQuizId === quiz.id ? "Klik lagi untuk konfirmasi" : "Hapus Kuis"}
-                        >
-                          {deletingQuizId === quiz.id ? (
-                            <span className="text-[8px] font-black uppercase px-1">Yakin?</span>
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </button>
                       <div className="mb-4 md:mb-6">
-                        <h3 className="font-black text-lg md:text-xl text-brand-navy mb-1 group-hover:text-brand-orange transition-colors line-clamp-1">{quiz.title}</h3>
+                        <h3 className="font-black text-lg md:text-xl text-brand-navy mb-1 group-hover:text-brand-orange transition-colors line-clamp-2">{quiz.title}</h3>
                         <p className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">
                           {quiz.questions.length} Pertanyaan • {quiz.quizType === "true_false" ? "Benar/Salah" : quiz.quizType === "duck_hunt" ? "Duck Hunt" : quiz.quizType === "hidden_word" ? "Kata Tersembunyi" : "Pilihan Ganda"}
                         </p>
@@ -454,13 +436,32 @@ export default function GuruDashboard() {
                           </p>
                         )}
                       </div>
-                      <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
                         <button 
                           onClick={() => setViewingQuiz(quiz)}
-                          className="w-full bg-brand-orange text-white py-3 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-brand-orange/90 transition-colors shadow-lg shadow-brand-orange/20 active:scale-95"
+                          className="flex-1 bg-brand-orange text-white py-3 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-brand-orange/90 transition-colors shadow-lg shadow-brand-orange/20 active:scale-95"
                         >
                           <Eye className="w-4 h-4" />
                           Lihat Soal
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteQuiz(quiz.id);
+                          }}
+                          className={`px-4 rounded-2xl transition-all flex items-center justify-center active:scale-95 ${
+                            deletingQuizId === quiz.id 
+                              ? "bg-red-500 text-white shadow-lg shadow-red-500/20" 
+                              : "bg-red-50 text-red-500 hover:bg-red-100"
+                          }`}
+                          title={deletingQuizId === quiz.id ? "Klik lagi untuk konfirmasi" : "Hapus Kuis"}
+                        >
+                          {deletingQuizId === quiz.id ? (
+                            <span className="text-[10px] font-black uppercase">Yakin?</span>
+                          ) : (
+                            <Trash2 className="w-5 h-5" />
+                          )}
                         </button>
                       </div>
                     </div>
@@ -469,9 +470,10 @@ export default function GuruDashboard() {
               )}
             </section>
           </div>
+        )}
 
-          {/* Room History & Student Ranking */}
-          <div className="space-y-6">
+        {mainTab === "beranda" && (
+          <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
             <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5">
               <h2 className="text-xl md:text-2xl font-black text-brand-navy mb-6 md:mb-8 flex items-center gap-3 tracking-tight">
                 <History className="w-6 h-6 md:w-7 md:h-7 text-brand-orange" />
@@ -498,7 +500,7 @@ export default function GuruDashboard() {
                           onClick={() => router.push(`/room/guru/${room.roomCode}`)}
                           className="flex-1 text-center py-2 text-xs font-black text-brand-orange hover:text-brand-orange/80 transition-colors uppercase tracking-widest"
                         >
-                          Pantau &rarr;
+                          {room.status === 'finished' ? 'Laporan \u2192' : 'Pantau \u2192'}
                         </button>
                         <button 
                           type="button"
@@ -571,8 +573,7 @@ export default function GuruDashboard() {
               )}
             </section>
           </div>
-        </div>
-      </div>
+        )}
 
       {/* Full Leaderboard Modal */}
       {isViewingLeaderboard && (
@@ -663,8 +664,49 @@ export default function GuruDashboard() {
               )}
             </div>
           </div>
-        </div>
-      )}
+          </div>
+        )}
+
+        {mainTab === "tugas" && (
+          <div className="flex flex-col items-center justify-center py-12 text-center animate-in fade-in zoom-in-95 duration-300">
+            <div className="w-20 h-20 bg-brand-cream/50 text-brand-navy/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
+              <FileText className="w-10 h-10" />
+            </div>
+            <h2 className="text-2xl font-black text-brand-navy mb-2 tracking-tight">Tugas</h2>
+            <p className="text-brand-navy/60 text-sm font-medium">Belum ada tugas yang diberikan.</p>
+          </div>
+        )}
+
+        {mainTab === "materi" && (
+          <div className="flex flex-col items-center justify-center py-12 text-center animate-in fade-in zoom-in-95 duration-300">
+            <div className="w-20 h-20 bg-brand-cream/50 text-brand-navy/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
+              <BookOpen className="w-10 h-10" />
+            </div>
+            <h2 className="text-2xl font-black text-brand-navy mb-2 tracking-tight">Materi</h2>
+            <p className="text-brand-navy/60 text-sm font-medium">Materi pelajaran akan muncul di sini.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-brand-navy/10 flex justify-around items-center p-4 pb-safe z-50 md:hidden shadow-[0_-10px_40px_rgba(0,0,0,0.05)] rounded-t-3xl">
+        <button onClick={() => setMainTab("beranda")} className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "beranda" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}>
+          <Home className={`w-6 h-6 ${mainTab === "beranda" ? "fill-current" : ""}`} />
+          <span className="text-[10px] font-black uppercase tracking-widest">Beranda</span>
+        </button>
+        <button onClick={() => setMainTab("kuis")} className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "kuis" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}>
+          <Play className={`w-6 h-6 ${mainTab === "kuis" ? "fill-current" : ""}`} />
+          <span className="text-[10px] font-black uppercase tracking-widest">Kuis</span>
+        </button>
+        <button onClick={() => setMainTab("tugas")} className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "tugas" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}>
+          <FileText className={`w-6 h-6 ${mainTab === "tugas" ? "fill-current" : ""}`} />
+          <span className="text-[10px] font-black uppercase tracking-widest">Tugas</span>
+        </button>
+        <button onClick={() => setMainTab("materi")} className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "materi" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}>
+          <BookOpen className={`w-6 h-6 ${mainTab === "materi" ? "fill-current" : ""}`} />
+          <span className="text-[10px] font-black uppercase tracking-widest">Materi</span>
+        </button>
+      </nav>
 
       {/* Quiz Details Modal */}
       {viewingQuiz && (
