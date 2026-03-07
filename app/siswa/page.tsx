@@ -75,7 +75,7 @@ export default function SiswaDashboard() {
         // 4. Fetch Materials
         const qMaterials = query(collection(db, "materials"), orderBy("order", "asc"));
         const snapshotMaterials = await getDocs(qMaterials);
-        const materialsData = snapshotMaterials.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const materialsData = snapshotMaterials.docs.map(doc => ({ id: doc.id, ...doc.data() } as Material));
         setMaterials(materialsData);
       } catch (error) {
         console.error("Error fetching data:", error);
