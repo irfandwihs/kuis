@@ -59,6 +59,10 @@ export default function SiswaDashboard() {
   const [quizHistory, setQuizHistory] = useState<any[]>([]);
   const [globalLeaderboard, setGlobalLeaderboard] = useState<any[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [allMaterials, setAllMaterials] = useState<Material[]>([]);
+  const [selectedSubjectFilter, setSelectedSubjectFilter] =
+    useState<string>("all");
+  const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
   const [viewingMaterial, setViewingMaterial] = useState<Material | null>(null);
   const [mainTab, setMainTab] = useState<
     "beranda" | "kuis" | "tugas" | "materi"
@@ -121,7 +125,14 @@ export default function SiswaDashboard() {
         const materialsData = snapshotMaterials.docs.map(
           (doc) => ({ id: doc.id, ...doc.data() }) as Material,
         );
+        setAllMaterials(materialsData);
         setMaterials(materialsData);
+
+        // Extract unique subjects
+        const subjects = Array.from(
+          new Set(materialsData.map((m) => m.subject).filter(Boolean)),
+        ) as string[];
+        setAvailableSubjects(subjects.sort());
       } catch (error) {
         console.error("Error fetching data:", error);
       }
@@ -129,6 +140,17 @@ export default function SiswaDashboard() {
 
     fetchData();
   }, [userData?.uid, userData?.xp, userData?.quizzesPlayed]);
+
+  // Filter materials based on selected subject
+  useEffect(() => {
+    if (selectedSubjectFilter === "all") {
+      setMaterials(allMaterials);
+    } else {
+      setMaterials(
+        allMaterials.filter((m) => m.subject === selectedSubjectFilter),
+      );
+    }
+  }, [selectedSubjectFilter, allMaterials]);
 
   const xp = userData?.xp || 0;
   const quizzesPlayed = userData?.quizzesPlayed || 0;
@@ -538,6 +560,35 @@ export default function SiswaDashboard() {
                 </h2>
               </div>
 
+              {/* Subject Filter */}
+              {availableSubjects.length > 0 && (
+                <div className="mb-6 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedSubjectFilter("all")}
+                    className={`px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${
+                      selectedSubjectFilter === "all"
+                        ? "bg-brand-orange text-white shadow-lg shadow-brand-orange/20"
+                        : "bg-brand-cream text-brand-navy hover:bg-brand-cream/50"
+                    }`}
+                  >
+                    Semua Materi
+                  </button>
+                  {availableSubjects.map((subject) => (
+                    <button
+                      key={subject}
+                      onClick={() => setSelectedSubjectFilter(subject)}
+                      className={`px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${
+                        selectedSubjectFilter === subject
+                          ? "bg-brand-orange text-white shadow-lg shadow-brand-orange/20"
+                          : "bg-brand-cream text-brand-navy hover:bg-brand-cream/50"
+                      }`}
+                    >
+                      {subject}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {materials.length === 0 ? (
                 <div className="text-center py-12 md:py-16 bg-brand-cream/30 rounded-[32px] border-2 border-dashed border-brand-navy/10">
                   <BookOpen className="w-10 h-10 md:w-12 md:h-12 text-brand-navy/20 mx-auto mb-4" />
@@ -594,11 +645,16 @@ export default function SiswaDashboard() {
                           </div>
 
                           <div className="mt-4 text-center max-w-[200px]">
-                            <h3 className="font-black text-brand-navy text-sm mb-1 truncate">
+                            <h3 className="font-black text-brand-navy text-sm mb-2 truncate">
                               {mat.title}
                             </h3>
-                            <p className="text-[10px] font-bold text-brand-navy/40 uppercase tracking-widest">
-                              {mat.subject}
+                            {mat.subject && (
+                              <div className="inline-block px-2 py-1 bg-brand-orange/10 text-brand-orange text-[9px] font-black uppercase tracking-widest rounded-md mb-1">
+                                {mat.subject}
+                              </div>
+                            )}
+                            <p className="text-[10px] font-bold text-brand-navy/40 uppercase tracking-widest line-clamp-2">
+                              {mat.description}
                             </p>
                           </div>
                         </div>
@@ -616,18 +672,21 @@ export default function SiswaDashboard() {
       {viewingMaterial && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white w-full max-w-3xl max-h-[90vh] rounded-[40px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="p-6 md:p-8 border-b border-brand-navy/5 flex justify-between items-center bg-brand-cream/30">
-              <div>
+            <div className="p-6 md:p-8 border-b border-brand-navy/5 flex justify-between items-start bg-brand-cream/30">
+              <div className="flex-1">
                 <span className="inline-block px-2 py-1 bg-brand-orange/10 text-brand-orange text-[10px] font-black uppercase tracking-widest rounded-md mb-2">
                   {viewingMaterial.subject}
                 </span>
-                <h2 className="text-xl md:text-2xl font-black text-brand-navy tracking-tight">
+                <h2 className="text-xl md:text-2xl font-black text-brand-navy tracking-tight mb-2">
                   {viewingMaterial.title}
                 </h2>
+                <p className="text-sm text-brand-navy/60 font-medium">
+                  {viewingMaterial.description}
+                </p>
               </div>
               <button
                 onClick={() => setViewingMaterial(null)}
-                className="p-2 hover:bg-brand-navy/5 rounded-full transition-colors text-brand-navy/40 hover:text-brand-navy"
+                className="p-2 hover:bg-brand-navy/5 rounded-full transition-colors text-brand-navy/40 hover:text-brand-navy ml-4 flex-shrink-0"
               >
                 <X className="w-6 h-6" />
               </button>

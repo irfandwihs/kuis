@@ -543,7 +543,7 @@ export default function GuruDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-cream flex flex-col items-center">
+    <div className="min-h-screen bg-brand-cream flex flex-col items-center pb-24 md:pb-32">
       <div className="w-full max-w-md md:max-w-4xl px-4 py-6 md:py-10">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 bg-white p-6 md:p-8 rounded-[32px] shadow-sm gap-4 border border-brand-navy/5">
           <div className="flex items-center gap-4">
@@ -1326,7 +1326,7 @@ export default function GuruDashboard() {
         )}
       </div>
 
-      {/* Bottom Navigation */}
+      {/* Bottom Navigation - Mobile */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-brand-navy/10 flex justify-around items-center p-4 pb-safe z-50 md:hidden shadow-[0_-10px_40px_rgba(0,0,0,0.05)] rounded-t-3xl">
         <button
           onClick={() => setMainTab("beranda")}
@@ -1369,6 +1369,70 @@ export default function GuruDashboard() {
             className={`w-6 h-6 ${mainTab === "materi" ? "fill-current" : ""}`}
           />
           <span className="text-[10px] font-black uppercase tracking-widest">
+            Materi
+          </span>
+        </button>
+      </nav>
+
+      {/* Bottom Navigation - Desktop */}
+      <nav className="hidden md:flex fixed bottom-0 left-0 right-0 bg-white border-t border-brand-navy/10 justify-center items-center gap-12 p-6 z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+        <button
+          onClick={() => setMainTab("beranda")}
+          className={`flex flex-col items-center gap-2 transition-all px-6 py-3 rounded-2xl ${
+            mainTab === "beranda"
+              ? "bg-brand-orange/10 text-brand-orange"
+              : "text-brand-navy/40 hover:text-brand-navy/60 hover:bg-brand-navy/5"
+          }`}
+        >
+          <Home
+            className={`w-6 h-6 ${mainTab === "beranda" ? "fill-current" : ""}`}
+          />
+          <span className="text-xs font-black uppercase tracking-widest">
+            Beranda
+          </span>
+        </button>
+        <button
+          onClick={() => setMainTab("kuis")}
+          className={`flex flex-col items-center gap-2 transition-all px-6 py-3 rounded-2xl ${
+            mainTab === "kuis"
+              ? "bg-brand-orange/10 text-brand-orange"
+              : "text-brand-navy/40 hover:text-brand-navy/60 hover:bg-brand-navy/5"
+          }`}
+        >
+          <Play
+            className={`w-6 h-6 ${mainTab === "kuis" ? "fill-current" : ""}`}
+          />
+          <span className="text-xs font-black uppercase tracking-widest">
+            Kuis
+          </span>
+        </button>
+        <button
+          onClick={() => setMainTab("tugas")}
+          className={`flex flex-col items-center gap-2 transition-all px-6 py-3 rounded-2xl ${
+            mainTab === "tugas"
+              ? "bg-brand-orange/10 text-brand-orange"
+              : "text-brand-navy/40 hover:text-brand-navy/60 hover:bg-brand-navy/5"
+          }`}
+        >
+          <FileText
+            className={`w-6 h-6 ${mainTab === "tugas" ? "fill-current" : ""}`}
+          />
+          <span className="text-xs font-black uppercase tracking-widest">
+            Tugas
+          </span>
+        </button>
+        <button
+          onClick={() => setMainTab("materi")}
+          className={`flex flex-col items-center gap-2 transition-all px-6 py-3 rounded-2xl ${
+            mainTab === "materi"
+              ? "bg-brand-orange/10 text-brand-orange"
+              : "text-brand-navy/40 hover:text-brand-navy/60 hover:bg-brand-navy/5"
+          }`}
+        >
+          <BookOpen
+            className={`w-6 h-6 ${mainTab === "materi" ? "fill-current" : ""}`}
+          />
+          <span className="text-xs font-black uppercase tracking-widest">
             Materi
           </span>
         </button>
