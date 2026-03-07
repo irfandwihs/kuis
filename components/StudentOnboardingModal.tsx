@@ -11,7 +11,7 @@ export default function StudentOnboardingModal() {
   const [name, setName] = useState(userData?.displayName || "");
   const [studentClass, setStudentClass] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // Character Creator State
   const [avatarIdx, setAvatarIdx] = useState(0);
 
@@ -29,7 +29,7 @@ export default function StudentOnboardingModal() {
       await updateProfile({
         displayName: name,
         avatar: avatarString,
-        studentClass: studentClass
+        studentClass: studentClass,
       });
     } catch (error) {
       console.error("Error updating profile:", error);
@@ -49,17 +49,29 @@ export default function StudentOnboardingModal() {
           {/* Left Side: Preview */}
           <div className="bg-brand-navy p-8 md:w-2/5 flex flex-col items-center justify-center text-center relative">
             <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-              <div className="absolute top-4 left-4 rotate-12"><Sparkles className="w-8 h-8 text-white" /></div>
-              <div className="absolute bottom-4 right-4 -rotate-12"><GraduationCap className="w-8 h-8 text-white" /></div>
+              <div className="absolute top-4 left-4 rotate-12">
+                <Sparkles className="w-8 h-8 text-white" />
+              </div>
+              <div className="absolute bottom-4 right-4 -rotate-12">
+                <GraduationCap className="w-8 h-8 text-white" />
+              </div>
             </div>
-            
+
             <div className="relative mb-6">
               <div className="absolute -inset-4 bg-brand-orange/20 rounded-full blur-2xl animate-pulse" />
-              <Avatar avatarString={avatarString} size="xl" className="relative z-10 border-4 border-white shadow-2xl" />
+              <Avatar
+                avatarString={avatarString}
+                size="xl"
+                className="relative z-10 border-4 border-white shadow-2xl"
+              />
             </div>
-            
-            <h2 className="text-2xl font-black text-white tracking-tight mb-2">Pilih Avatarmu</h2>
-            <p className="text-white/60 text-xs font-medium">Capybara mana yang paling menggambarkan dirimu hari ini?</p>
+
+            <h2 className="text-2xl font-black text-white tracking-tight mb-2">
+              Pilih Avatarmu
+            </h2>
+            <p className="text-white/60 text-xs font-medium">
+              Capybara mana yang paling menggambarkan dirimu hari ini?
+            </p>
           </div>
 
           {/* Right Side: Controls */}
@@ -95,9 +107,38 @@ export default function StudentOnboardingModal() {
                       onChange={(e) => setStudentClass(e.target.value)}
                       className="w-full pl-12 pr-4 py-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none text-brand-navy font-bold transition-all appearance-none cursor-pointer"
                     >
-                      <option value="" disabled>Pilih Kelas</option>
-                      {["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6", "Kelas 7", "Kelas 8", "Kelas 9", "Kelas 10", "Kelas 11", "Kelas 12"].map(cls => (
-                        <option key={cls} value={cls}>{cls}</option>
+                      <option value="" disabled>
+                        Pilih Kelas
+                      </option>
+                      {[
+                        "7A",
+                        "7B",
+                        "7C",
+                        "7D",
+                        "7E",
+                        "7F",
+                        "7G",
+                        "7H",
+                        "8A",
+                        "8B",
+                        "8C",
+                        "8D",
+                        "8E",
+                        "8F",
+                        "8G",
+                        "8H",
+                        "9A",
+                        "9B",
+                        "9C",
+                        "9D",
+                        "9E",
+                        "9F",
+                        "9G",
+                        "9H",
+                      ].map((cls) => (
+                        <option key={cls} value={cls}>
+                          {cls}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -116,18 +157,18 @@ export default function StudentOnboardingModal() {
                       type="button"
                       onClick={() => setAvatarIdx(idx)}
                       className={`relative aspect-square rounded-2xl overflow-hidden border-4 transition-all ${
-                        avatarIdx === idx 
-                          ? "border-brand-orange shadow-lg shadow-brand-orange/20 scale-105 z-10" 
+                        avatarIdx === idx
+                          ? "border-brand-orange shadow-lg shadow-brand-orange/20 scale-105 z-10"
                           : "border-transparent hover:border-brand-orange/30 hover:scale-105"
                       }`}
                     >
-                      <div 
+                      <div
                         className="w-full h-full"
                         style={{
                           backgroundImage: "url('/capybara.png')",
                           backgroundSize: "300% 300%",
                           backgroundPosition: pos,
-                          backgroundRepeat: "no-repeat"
+                          backgroundRepeat: "no-repeat",
                         }}
                       />
                     </button>
