@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
-import { adminAuth } from '@/lib/firebase-admin';
+import { getAdminAuth } from '@/lib/firebase-admin';
 
 const ADMIN_EMAIL = "irfandwi.hs@gmail.com";
 
 export async function POST(request: Request) {
   try {
-    if (!adminAuth) {
+    const auth = getAdminAuth();
+    if (!auth) {
       return NextResponse.json({ error: 'Firebase Admin not initialized. Please set FIREBASE_SERVICE_ACCOUNT_KEY.' }, { status: 500 });
     }
 
@@ -16,14 +17,14 @@ export async function POST(request: Request) {
     }
 
     // Verify the requester is the admin
-    const decodedToken = await adminAuth.verifyIdToken(idToken);
+    const decodedToken = await auth.verifyIdToken(idToken);
     
     if (decodedToken.email !== ADMIN_EMAIL) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     // Delete the user from Authentication
-    await adminAuth.deleteUser(uid);
+    await auth.deleteUser(uid);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

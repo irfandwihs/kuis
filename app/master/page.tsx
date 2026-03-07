@@ -17,6 +17,7 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAdminInitialized, setIsAdminInitialized] = useState<boolean | null>(null);
 
   // Hardcoded admin email as requested
   const ADMIN_EMAIL = "irfandwi.hs@gmail.com";
@@ -44,7 +45,18 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchAllUsers();
+    checkAdminStatus();
   }, [fetchAllUsers]);
+
+  const checkAdminStatus = async () => {
+    try {
+      const res = await fetch('/api/admin/status');
+      const data = await res.json();
+      setIsAdminInitialized(data.initialized);
+    } catch (e) {
+      setIsAdminInitialized(false);
+    }
+  };
 
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -204,6 +216,16 @@ export default function AdminDashboard() {
             className="w-full pl-12 pr-6 py-4 bg-white rounded-2xl border border-brand-navy/5 shadow-sm focus:border-brand-orange outline-none transition-all font-bold text-brand-navy"
           />
         </div>
+
+        {isAdminInitialized === false && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3 text-amber-800">
+            <ShieldCheck className="w-5 h-5 text-amber-500" />
+            <div className="text-xs font-bold">
+              <p className="uppercase tracking-widest mb-1">Peringatan Konfigurasi</p>
+              <p className="opacity-80">Firebase Admin belum dikonfigurasi. Penghapusan akun Authentication tidak akan berfungsi. Harap atur <code className="bg-amber-100 px-1 rounded">FIREBASE_SERVICE_ACCOUNT_KEY</code> di Environment Variables.</p>
+            </div>
+          </div>
+        )}
 
         <div className="bg-white rounded-[40px] shadow-2xl shadow-brand-navy/5 border border-brand-navy/5 overflow-hidden">
           {/* Table Header - Hidden on mobile */}
