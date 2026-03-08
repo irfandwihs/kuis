@@ -18,6 +18,7 @@ interface UserData {
   quizzesPlayed?: number;
   avatar?: string;
   studentClass?: string;
+  absenNumber?: number;
   profileCompleted?: boolean;
   diamonds?: number;
   inventory?: Record<string, number>;

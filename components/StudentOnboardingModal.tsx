@@ -31,7 +31,7 @@ export default function StudentOnboardingModal() {
         displayName: name,
         avatar: avatarString,
         studentClass: studentClass,
-        absenNumber: absenNumber,
+        absenNumber: parseInt(absenNumber, 10),
       });
     } catch (error) {
       console.error("Error updating profile:", error);
