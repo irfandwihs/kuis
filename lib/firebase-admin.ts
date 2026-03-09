@@ -31,12 +31,32 @@ function getAdminApp() {
     try {
       serviceAccount = JSON.parse(sanitizedKey);
     } catch (e) {
-      // If it's not valid JSON, maybe it's double escaped
-      serviceAccount = JSON.parse(sanitizedKey.replace(/\\n/g, '\n'));
+      // If it's not valid JSON, maybe it's double escaped or has literal newlines
+      try {
+        serviceAccount = JSON.parse(sanitizedKey.replace(/\\n/g, '\n'));
+      } catch (e2) {
+        console.error("FIREBASE_SERVICE_ACCOUNT_KEY is not a valid JSON string.");
+        return null;
+      }
     }
     
-    if (serviceAccount.private_key) {
+    if (serviceAccount && serviceAccount.private_key) {
+      // Log key info for debugging (SAFE: no full key logged)
+      const keyPreview = serviceAccount.private_key.substring(0, 30);
+      console.log(`Firebase Admin: Private key found. Preview: ${keyPreview}... Length: ${serviceAccount.private_key.length}`);
+      
+      // The private key must have actual newlines, not literal "\n" strings
       serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+      
+      // Sometimes the key might have escaped quotes at the beginning/end
+      if (serviceAccount.private_key.startsWith('"') && serviceAccount.private_key.endsWith('"')) {
+        serviceAccount.private_key = serviceAccount.private_key.substring(1, serviceAccount.private_key.length - 1);
+      }
+    }
+
+    if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
+      console.error("Service account object is missing required fields (project_id, private_key, client_email).");
+      return null;
     }
 
     adminApp = admin.initializeApp({

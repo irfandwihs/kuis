@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { collection, query, where, onSnapshot, doc, updateDoc, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { Users, Play, Square, ArrowLeft, CheckCircle2, Circle, Clock, FileText, Download, X } from "lucide-react";
+import { Users, Play, Square, ArrowLeft, CheckCircle2, Circle, Clock, FileText, Download, X, Flag } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import Avatar from "@/components/Avatar";
 
@@ -49,7 +49,7 @@ export default function GuruRoom() {
   const downloadCSV = () => {
     if (leaderboard.length === 0) return;
 
-    const headers = ["Peringkat", "Nama Siswa", "Kelas", "Skor (XP)", "Status"];
+    const headers = ["Peringkat", "Nama Siswa", "Kelas", "No Absen", "Skor (XP)", "Status"];
     const csvContent = [
       headers.join(","),
       ...leaderboard.map((entry, index) => {
@@ -57,6 +57,7 @@ export default function GuruRoom() {
           index + 1,
           `"${entry.siswaName}"`,
           `"${entry.studentClass || "-"}"`,
+          `"${entry.studentAbsen || "-"}"`,
           entry.score,
           entry.status === "finished" ? "Selesai" : "Belum Selesai"
         ].join(",");
@@ -93,31 +94,41 @@ export default function GuruRoom() {
             {roomCode}
           </div>
           
-          <div className="flex justify-center gap-4">
-            {room.status === "waiting" && (
-              <button 
-                onClick={() => updateRoomStatus("active")}
-                className="w-full bg-brand-orange text-white py-5 rounded-2xl font-black flex items-center justify-center gap-3 hover:bg-brand-orange/90 shadow-lg shadow-brand-orange/20 transition-all active:scale-95"
-              >
-                <Play className="w-6 h-6 fill-current" /> Mulai Kuis
-              </button>
-            )}
-            {room.status === "active" && (
-              <button 
-                onClick={() => updateRoomStatus("finished")}
-                className="w-full bg-brand-navy text-white py-5 rounded-2xl font-black flex items-center justify-center gap-3 hover:bg-brand-black shadow-lg shadow-brand-navy/20 transition-all active:scale-95"
-              >
-                <Square className="w-6 h-6 fill-current" /> Akhiri Kuis
-              </button>
-            )}
-            {room.status === "finished" && (
-              <button 
-                onClick={() => setShowReport(true)}
-                className="w-full bg-emerald-500 text-white py-5 rounded-2xl font-black flex items-center justify-center gap-3 hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
-              >
-                <FileText className="w-6 h-6" /> Lihat Laporan
-              </button>
-            )}
+          <div className="flex flex-col gap-4">
+            <div className="flex justify-center gap-4">
+              {room.status === "waiting" && (
+                <button 
+                  onClick={() => updateRoomStatus("active")}
+                  className="w-full bg-brand-orange text-white py-5 rounded-2xl font-black flex items-center justify-center gap-3 hover:bg-brand-orange/90 shadow-lg shadow-brand-orange/20 transition-all active:scale-95"
+                >
+                  <Play className="w-6 h-6 fill-current" /> Mulai Kuis
+                </button>
+              )}
+              {room.status === "active" && (
+                <button 
+                  onClick={() => updateRoomStatus("finished")}
+                  className="w-full bg-brand-navy text-white py-5 rounded-2xl font-black flex items-center justify-center gap-3 hover:bg-brand-black shadow-lg shadow-brand-navy/20 transition-all active:scale-95"
+                >
+                  <Square className="w-6 h-6 fill-current" /> Akhiri Kuis
+                </button>
+              )}
+              {room.status === "finished" && (
+                <button 
+                  onClick={() => setShowReport(true)}
+                  className="w-full bg-emerald-500 text-white py-5 rounded-2xl font-black flex items-center justify-center gap-3 hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
+                >
+                  <FileText className="w-6 h-6" /> Lihat Laporan
+                </button>
+              )}
+            </div>
+            
+            {/* Race Mode Button */}
+            <button 
+              onClick={() => router.push(`/room/guru/${roomCode}/race`)}
+              className="w-full bg-sky-500 text-white py-4 rounded-2xl font-black flex items-center justify-center gap-3 hover:bg-sky-600 shadow-lg shadow-sky-500/20 transition-all active:scale-95"
+            >
+              <Flag className="w-5 h-5" /> Tampilkan Mode Balapan
+            </button>
           </div>
         </div>
 
@@ -166,7 +177,7 @@ export default function GuruRoom() {
                         <div>
                           <h3 className="font-black text-brand-navy text-base leading-none mb-1">{entry.siswaName}</h3>
                           <p className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest">
-                            {entry.studentClass} • {entry.status === "finished" ? "Selesai" : "Sedang Mengerjakan"}
+                            {entry.studentClass} • No Absen {entry.studentAbsen || "-"} • {entry.status === "finished" ? "Selesai" : "Sedang Mengerjakan"}
                           </p>
                         </div>
                       </div>
@@ -252,6 +263,7 @@ export default function GuruRoom() {
                           <th className="p-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest text-center">Peringkat</th>
                           <th className="p-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest">Siswa</th>
                           <th className="p-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest">Kelas</th>
+                          <th className="p-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest text-center">No Absen</th>
                           <th className="p-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest text-right">Skor (XP)</th>
                           <th className="p-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest text-center">Status</th>
                         </tr>
@@ -281,6 +293,7 @@ export default function GuruRoom() {
                                 </div>
                               </td>
                               <td className="p-4 text-sm font-bold text-brand-navy/60">{entry.studentClass || "-"}</td>
+                              <td className="p-4 text-sm font-bold text-brand-navy/60 text-center">{entry.studentAbsen || "-"}</td>
                               <td className="p-4 text-right font-black text-brand-orange">{entry.score}</td>
                               <td className="p-4 text-center">
                                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${

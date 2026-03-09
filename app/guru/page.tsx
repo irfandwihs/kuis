@@ -31,10 +31,27 @@ import {
   FileText,
   Users,
   Link as LinkIcon,
+  BarChart2,
+  TrendingUp,
+  PieChart as PieChartIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { GoogleGenAI, Type } from "@google/genai";
 import Avatar from "@/components/Avatar";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 
 interface Quiz {
   id: string;
@@ -89,8 +106,19 @@ export default function GuruDashboard() {
   const [fullLeaderboard, setFullLeaderboard] = useState<any[]>([]);
   const [isFetchingLeaderboard, setIsFetchingLeaderboard] = useState(false);
   const [mainTab, setMainTab] = useState<
-    "beranda" | "kuis" | "tugas" | "materi"
+    "beranda" | "kuis" | "tugas" | "materi" | "analitik"
   >("beranda");
+
+  // Analytics State
+  const [analyticsData, setAnalyticsData] = useState<{
+    classStats: any[];
+    quizStats: any[];
+    timeStats: any[];
+    totalStudents: number;
+    totalQuizzes: number;
+    avgScore: number;
+  } | null>(null);
+  const [isFetchingAnalytics, setIsFetchingAnalytics] = useState(false);
 
   // Manual Quiz State
   const [isCreatingManualQuiz, setIsCreatingManualQuiz] = useState(false);
@@ -198,6 +226,93 @@ export default function GuruDashboard() {
     }
   }, []);
 
+  const fetchAnalytics = useCallback(async () => {
+    if (!userData?.uid || rooms.length === 0) return;
+    setIsFetchingAnalytics(true);
+    try {
+      const classMap: Record<string, { total: number; count: number }> = {};
+      const quizMap: Record<string, { title: string; total: number; count: number }> = {};
+      const timeMap: Record<string, { total: number; count: number }> = {};
+      
+      let totalScore = 0;
+      let totalParticipants = 0;
+
+      // Fetch leaderboards for all rooms
+      const lbPromises = rooms.map(async (room) => {
+        const lbRef = collection(db, "rooms", room.id, "leaderboard");
+        const snapshot = await getDocs(lbRef);
+        return { room, docs: snapshot.docs };
+      });
+
+      const results = await Promise.all(lbPromises);
+
+      results.forEach(({ room, docs }) => {
+        docs.forEach((doc) => {
+          const data = doc.data();
+          if (data.status === "finished") {
+            const score = data.score || 0;
+            const className = data.studentClass || "Tanpa Kelas";
+            const quizTitle = room.quizTitle || "Kuis Tanpa Judul";
+            const date = room.createdAt?.toDate()?.toLocaleDateString("id-ID", { month: "short", day: "numeric" }) || "Unknown";
+
+            // Class Stats
+            if (!classMap[className]) classMap[className] = { total: 0, count: 0 };
+            classMap[className].total += score;
+            classMap[className].count += 1;
+
+            // Quiz Stats
+            if (!quizMap[room.quizId]) quizMap[room.quizId] = { title: quizTitle, total: 0, count: 0 };
+            quizMap[room.quizId].total += score;
+            quizMap[room.quizId].count += 1;
+
+            // Time Stats
+            if (!timeMap[date]) timeMap[date] = { total: 0, count: 0 };
+            timeMap[date].total += score;
+            timeMap[date].count += 1;
+
+            totalScore += score;
+            totalParticipants += 1;
+          }
+        });
+      });
+
+      const classStats = Object.entries(classMap).map(([name, stats]) => ({
+        name,
+        avg: Math.round(stats.total / stats.count),
+        count: stats.count
+      })).sort((a, b) => b.avg - a.avg);
+
+      const quizStats = Object.entries(quizMap).map(([id, stats]) => ({
+        name: stats.title,
+        avg: Math.round(stats.total / stats.count),
+        count: stats.count
+      })).sort((a, b) => a.avg - b.avg); // Sort by lowest average to see "difficult" topics
+
+      const timeStats = Object.entries(timeMap).map(([date, stats]) => ({
+        date,
+        avg: Math.round(stats.total / stats.count)
+      }));
+
+      setAnalyticsData({
+        classStats,
+        quizStats,
+        timeStats,
+        totalStudents: totalParticipants,
+        totalQuizzes: rooms.length,
+        avgScore: totalParticipants > 0 ? Math.round(totalScore / totalParticipants) : 0
+      });
+    } catch (error) {
+      console.error("Error fetching analytics:", error);
+    } finally {
+      setIsFetchingAnalytics(false);
+    }
+  }, [userData?.uid, rooms]);
+
+  useEffect(() => {
+    if (mainTab === "analitik" && !analyticsData) {
+      fetchAnalytics();
+    }
+  }, [mainTab, analyticsData, fetchAnalytics]);
   const fetchFullLeaderboard = useCallback(async (classFilter: string) => {
     setIsFetchingLeaderboard(true);
     try {
@@ -570,95 +685,139 @@ export default function GuruDashboard() {
 
         {mainTab === "kuis" && (
           <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
-            {/* AI Quiz Generator */}
-            <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-brand-orange/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-brand-orange/10 transition-colors" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* AI Quiz Generator */}
+              <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5 relative overflow-hidden group flex flex-col">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-orange/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-brand-orange/10 transition-colors" />
 
-              <div className="flex items-center gap-4 mb-6 md:mb-8">
-                <div className="p-3 md:p-4 bg-brand-orange text-white rounded-2xl shadow-lg shadow-brand-orange/20">
-                  <Sparkles className="w-5 h-5 md:w-6 md:h-6" />
+                <div className="flex items-center gap-4 mb-6 md:mb-8">
+                  <div className="p-3 md:p-4 bg-brand-orange text-white rounded-2xl shadow-lg shadow-brand-orange/20">
+                    <Sparkles className="w-5 h-5 md:w-6 md:h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-black text-brand-navy tracking-tight">
+                      Buat Kuis AI
+                    </h2>
+                    <p className="text-brand-navy/60 text-xs md:text-sm font-medium">
+                      Gunakan AI untuk membuat kuis instan
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-xl md:text-2xl font-black text-brand-navy tracking-tight">
-                    Buat Kuis AI
-                  </h2>
-                  <p className="text-brand-navy/60 text-xs md:text-sm font-medium">
-                    Gunakan AI untuk membuat kuis instan
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 mb-6 flex-1">
+                  <div className="space-y-2 sm:col-span-2">
+                    <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
+                      Topik Pembelajaran
+                    </label>
+                    <input
+                      type="text"
+                      value={topic}
+                      onChange={(e) => setTopic(e.target.value)}
+                      placeholder="misal: Fotosintesis..."
+                      className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none transition-all font-bold text-brand-navy text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
+                      Jumlah Soal
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={numQuestions}
+                      onChange={(e) => setNumQuestions(parseInt(e.target.value))}
+                      className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none transition-all font-bold text-brand-navy text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
+                      Mode Permainan
+                    </label>
+                    <select
+                      value={quizType}
+                      onChange={(e) =>
+                        setQuizType(
+                          e.target.value as
+                            | "multiple_choice"
+                            | "true_false"
+                            | "duck_hunt"
+                            | "hidden_word",
+                        )
+                      }
+                      className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none transition-all font-bold text-brand-navy text-sm cursor-pointer appearance-none"
+                    >
+                      <option value="multiple_choice">
+                        Pilihan Ganda (Classic)
+                      </option>
+                      <option value="true_false">Benar / Salah (Buzzer)</option>
+                      <option value="duck_hunt">Berburu Bebek (Duck Hunt)</option>
+                      <option value="hidden_word">Tebak Kata Tersembunyi</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  onClick={generateQuizWithAI}
+                  disabled={isGenerating || !topic}
+                  className="w-full bg-brand-navy text-white font-black text-base md:text-lg py-4 md:py-5 rounded-2xl hover:bg-brand-black hover:shadow-xl hover:shadow-brand-navy/20 transition-all disabled:opacity-50 flex justify-center items-center gap-3 active:scale-[0.98] mt-auto"
+                >
+                  {isGenerating ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Meracik Soal...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-5 h-5 md:w-6 md:h-6" />
+                      Buat Kuis Sekarang
+                    </>
+                  )}
+                </button>
+              </section>
+
+              {/* Manual Quiz Generator */}
+              <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5 relative overflow-hidden group flex flex-col">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-navy/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-brand-navy/10 transition-colors" />
+
+                <div className="flex items-center gap-4 mb-6 md:mb-8">
+                  <div className="p-3 md:p-4 bg-brand-navy text-white rounded-2xl shadow-lg shadow-brand-navy/20">
+                    <FileText className="w-5 h-5 md:w-6 md:h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-black text-brand-navy tracking-tight">
+                      Buat Kuis Manual
+                    </h2>
+                    <p className="text-brand-navy/60 text-xs md:text-sm font-medium">
+                      Buat kuis dengan pertanyaan Anda sendiri
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-brand-navy/10 rounded-3xl mb-6 bg-brand-cream/30">
+                  <FileText className="w-12 h-12 text-brand-navy/20 mb-4" />
+                  <p className="text-brand-navy/60 text-sm font-bold mb-2">
+                    Kustomisasi penuh untuk setiap soal
+                  </p>
+                  <p className="text-brand-navy/40 text-xs">
+                    Pilih mode permainan, tambahkan pertanyaan, dan tentukan jawaban yang benar secara manual.
                   </p>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
-                    Topik Pembelajaran
-                  </label>
-                  <input
-                    type="text"
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                    placeholder="misal: Fotosintesis..."
-                    className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none transition-all font-bold text-brand-navy text-sm"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
-                    Jumlah Soal
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="20"
-                    value={numQuestions}
-                    onChange={(e) => setNumQuestions(parseInt(e.target.value))}
-                    className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none transition-all font-bold text-brand-navy text-sm"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
-                    Mode Permainan
-                  </label>
-                  <select
-                    value={quizType}
-                    onChange={(e) =>
-                      setQuizType(
-                        e.target.value as
-                          | "multiple_choice"
-                          | "true_false"
-                          | "duck_hunt"
-                          | "hidden_word",
-                      )
-                    }
-                    className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none transition-all font-bold text-brand-navy text-sm cursor-pointer appearance-none"
-                  >
-                    <option value="multiple_choice">
-                      Pilihan Ganda (Classic)
-                    </option>
-                    <option value="true_false">Benar / Salah (Buzzer)</option>
-                    <option value="duck_hunt">Berburu Bebek (Duck Hunt)</option>
-                    <option value="hidden_word">Tebak Kata Tersembunyi</option>
-                  </select>
-                </div>
-              </div>
-
-              <button
-                onClick={generateQuizWithAI}
-                disabled={isGenerating || !topic}
-                className="w-full bg-brand-navy text-white font-black text-base md:text-lg py-4 md:py-5 rounded-2xl hover:bg-brand-black hover:shadow-xl hover:shadow-brand-navy/20 transition-all disabled:opacity-50 flex justify-center items-center gap-3 active:scale-[0.98]"
-              >
-                {isGenerating ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Meracik Soal...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-5 h-5 md:w-6 md:h-6" />
-                    Buat Kuis Sekarang
-                  </>
-                )}
-              </button>
-            </section>
+                <button
+                  onClick={() => {
+                    setIsCreatingManualQuiz(true);
+                    setManualQuizType("multiple_choice");
+                    setCurrentManualOptions(["", "", "", ""]);
+                    setCurrentManualCorrectIdx(0);
+                  }}
+                  className="w-full bg-brand-cream text-brand-navy font-black text-base md:text-lg py-4 md:py-5 rounded-2xl hover:bg-brand-navy hover:text-white hover:shadow-xl hover:shadow-brand-navy/20 transition-all flex justify-center items-center gap-3 active:scale-[0.98] mt-auto"
+                >
+                  <Plus className="w-5 h-5 md:w-6 md:h-6" />
+                  Buat Kuis Manual
+                </button>
+              </section>
+            </div>
 
             {/* My Quizzes */}
             <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5">
@@ -668,17 +827,6 @@ export default function GuruDashboard() {
                   Koleksi Kuis
                 </h2>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      setIsCreatingManualQuiz(true);
-                      setManualQuizType("multiple_choice");
-                      setCurrentManualOptions(["", "", "", ""]);
-                      setCurrentManualCorrectIdx(0);
-                    }}
-                    className="bg-brand-navy text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-brand-black transition-colors"
-                  >
-                    <Plus className="w-4 h-4" /> Manual
-                  </button>
                   <span className="bg-brand-cream text-brand-navy/60 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest hidden sm:inline-block">
                     {quizzes.length} Kuis
                   </span>
@@ -761,6 +909,150 @@ export default function GuruDashboard() {
           </div>
         )}
 
+        {mainTab === "analitik" && (
+          <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+            {isFetchingAnalytics ? (
+              <div className="bg-white p-12 rounded-[40px] shadow-sm border border-brand-navy/5 flex flex-col items-center justify-center">
+                <div className="w-12 h-12 border-4 border-brand-orange border-t-transparent rounded-full animate-spin mb-4" />
+                <p className="text-brand-navy font-black uppercase tracking-widest text-xs">Menganalisis Data...</p>
+              </div>
+            ) : analyticsData ? (
+              <>
+                {/* Stats Overview */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-white p-6 rounded-[32px] shadow-sm border border-brand-navy/5">
+                    <p className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest mb-1">Total Partisipan</p>
+                    <h3 className="text-3xl font-black text-brand-navy">{analyticsData.totalStudents}</h3>
+                    <p className="text-[10px] font-bold text-emerald-500 mt-1">Siswa Aktif</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-[32px] shadow-sm border border-brand-navy/5">
+                    <p className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest mb-1">Rata-rata Skor</p>
+                    <h3 className="text-3xl font-black text-brand-orange">{analyticsData.avgScore} XP</h3>
+                    <p className="text-[10px] font-bold text-brand-navy/40 mt-1">Seluruh Kuis</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-[32px] shadow-sm border border-brand-navy/5">
+                    <p className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest mb-1">Total Ruangan</p>
+                    <h3 className="text-3xl font-black text-brand-navy">{analyticsData.totalQuizzes}</h3>
+                    <p className="text-[10px] font-bold text-brand-navy/40 mt-1">Sesi Selesai</p>
+                  </div>
+                </div>
+
+                {/* Class Performance Chart */}
+                <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5">
+                  <h2 className="text-xl md:text-2xl font-black text-brand-navy mb-6 flex items-center gap-3 tracking-tight">
+                    <TrendingUp className="w-6 h-6 text-brand-orange" />
+                    Rata-rata Nilai per Kelas
+                  </h2>
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={analyticsData.classStats}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis 
+                          dataKey="name" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: '#1e293b', fontSize: 12, fontWeight: 700 }}
+                        />
+                        <YAxis 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: '#64748b', fontSize: 10 }}
+                        />
+                        <Tooltip 
+                          contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                          cursor={{ fill: '#f8fafc' }}
+                        />
+                        <Bar dataKey="avg" fill="#FF5A1F" radius={[8, 8, 0, 0]} barSize={40} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Difficult Topics */}
+                  <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5">
+                    <h2 className="text-xl font-black text-brand-navy mb-6 flex items-center gap-3 tracking-tight">
+                      <PieChartIcon className="w-6 h-6 text-brand-orange" />
+                      Materi Paling Menantang
+                    </h2>
+                    <p className="text-[10px] font-bold text-brand-navy/40 uppercase tracking-widest mb-6">
+                      Berdasarkan rata-rata skor terendah
+                    </p>
+                    <div className="space-y-4">
+                      {analyticsData.quizStats.slice(0, 5).map((quiz, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-4 bg-brand-cream/30 rounded-2xl border border-brand-navy/5">
+                          <div className="min-w-0">
+                            <p className="font-black text-brand-navy text-sm truncate">{quiz.name}</p>
+                            <p className="text-[10px] font-bold text-brand-navy/40 uppercase tracking-widest">{quiz.count} Partisipan</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-black text-red-500 text-sm">{quiz.avg} XP</p>
+                            <p className="text-[8px] font-bold text-brand-navy/30 uppercase tracking-widest">Rata-rata</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  {/* Performance Trend */}
+                  <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5">
+                    <h2 className="text-xl font-black text-brand-navy mb-6 flex items-center gap-3 tracking-tight">
+                      <TrendingUp className="w-6 h-6 text-brand-orange" />
+                      Tren Performa
+                    </h2>
+                    <div className="h-[250px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={analyticsData.timeStats}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                          <XAxis 
+                            dataKey="date" 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{ fill: '#64748b', fontSize: 10 }}
+                          />
+                          <YAxis 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{ fill: '#64748b', fontSize: 10 }}
+                          />
+                          <Tooltip 
+                            contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="avg" 
+                            stroke="#FF5A1F" 
+                            strokeWidth={4} 
+                            dot={{ fill: '#FF5A1F', strokeWidth: 2, r: 4 }}
+                            activeDot={{ r: 6, strokeWidth: 0 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </section>
+                </div>
+
+                <button 
+                  onClick={fetchAnalytics}
+                  className="w-full py-4 bg-brand-navy/5 text-brand-navy/40 font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-brand-navy/10 transition-all"
+                >
+                  Perbarui Analitik
+                </button>
+              </>
+            ) : (
+              <div className="bg-white p-12 rounded-[40px] shadow-sm border border-brand-navy/5 text-center">
+                <BarChart2 className="w-12 h-12 text-brand-navy/10 mx-auto mb-4" />
+                <p className="text-brand-navy/40 font-bold">Belum ada data untuk dianalisis.</p>
+                <button 
+                  onClick={fetchAnalytics}
+                  className="mt-4 px-6 py-3 bg-brand-navy text-white rounded-2xl font-black text-xs uppercase tracking-widest"
+                >
+                  Coba Lagi
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         {mainTab === "beranda" && (
           <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
             <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5">
@@ -1187,7 +1479,7 @@ export default function GuruDashboard() {
                               {student.displayName}
                             </p>
                             <p className="text-[10px] font-bold text-brand-navy/40 uppercase tracking-widest">
-                              Kelas {student.studentClass || "-"}
+                              Kelas {student.studentClass || "-"} • No Absen {student.studentAbsen || "-"}
                             </p>
                           </div>
                         </div>
@@ -1351,6 +1643,17 @@ export default function GuruDashboard() {
           </span>
         </button>
         <button
+          onClick={() => setMainTab("materi")}
+          className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "materi" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}
+        >
+          <BookOpen
+            className={`w-6 h-6 ${mainTab === "materi" ? "fill-current" : ""}`}
+          />
+          <span className="text-[10px] font-black uppercase tracking-widest">
+            Materi
+          </span>
+        </button>
+        <button
           onClick={() => setMainTab("tugas")}
           className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "tugas" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}
         >
@@ -1362,14 +1665,14 @@ export default function GuruDashboard() {
           </span>
         </button>
         <button
-          onClick={() => setMainTab("materi")}
-          className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "materi" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}
+          onClick={() => setMainTab("analitik")}
+          className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "analitik" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}
         >
-          <BookOpen
-            className={`w-6 h-6 ${mainTab === "materi" ? "fill-current" : ""}`}
+          <BarChart2
+            className={`w-6 h-6 ${mainTab === "analitik" ? "fill-current" : ""}`}
           />
           <span className="text-[10px] font-black uppercase tracking-widest">
-            Materi
+            Analitik
           </span>
         </button>
       </nav>
@@ -1407,6 +1710,21 @@ export default function GuruDashboard() {
           </span>
         </button>
         <button
+          onClick={() => setMainTab("materi")}
+          className={`flex flex-col items-center gap-2 transition-all px-6 py-3 rounded-2xl ${
+            mainTab === "materi"
+              ? "bg-brand-orange/10 text-brand-orange"
+              : "text-brand-navy/40 hover:text-brand-navy/60 hover:bg-brand-navy/5"
+          }`}
+        >
+          <BookOpen
+            className={`w-6 h-6 ${mainTab === "materi" ? "fill-current" : ""}`}
+          />
+          <span className="text-xs font-black uppercase tracking-widest">
+            Materi
+          </span>
+        </button>
+        <button
           onClick={() => setMainTab("tugas")}
           className={`flex flex-col items-center gap-2 transition-all px-6 py-3 rounded-2xl ${
             mainTab === "tugas"
@@ -1422,18 +1740,18 @@ export default function GuruDashboard() {
           </span>
         </button>
         <button
-          onClick={() => setMainTab("materi")}
+          onClick={() => setMainTab("analitik")}
           className={`flex flex-col items-center gap-2 transition-all px-6 py-3 rounded-2xl ${
-            mainTab === "materi"
+            mainTab === "analitik"
               ? "bg-brand-orange/10 text-brand-orange"
               : "text-brand-navy/40 hover:text-brand-navy/60 hover:bg-brand-navy/5"
           }`}
         >
-          <BookOpen
-            className={`w-6 h-6 ${mainTab === "materi" ? "fill-current" : ""}`}
+          <BarChart2
+            className={`w-6 h-6 ${mainTab === "analitik" ? "fill-current" : ""}`}
           />
           <span className="text-xs font-black uppercase tracking-widest">
-            Materi
+            Analitik
           </span>
         </button>
       </nav>

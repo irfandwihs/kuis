@@ -18,6 +18,8 @@ export default function AdminDashboard() {
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isAdminInitialized, setIsAdminInitialized] = useState<boolean | null>(null);
+  const [testResult, setTestResult] = useState<{ success: boolean; message?: string; error?: string } | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
 
   // Hardcoded admin email as requested
   const ADMIN_EMAIL = "irfandwi.hs@gmail.com";
@@ -55,6 +57,23 @@ export default function AdminDashboard() {
       setIsAdminInitialized(data.initialized);
     } catch (e) {
       setIsAdminInitialized(false);
+    }
+  };
+
+  const handleTestConfig = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch('/api/admin/test-config');
+      const data = await res.json();
+      setTestResult(data);
+      if (data.success) {
+        setIsAdminInitialized(true);
+      }
+    } catch (e: any) {
+      setTestResult({ success: false, error: e.message });
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -218,11 +237,39 @@ export default function AdminDashboard() {
         </div>
 
         {isAdminInitialized === false && (
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3 text-amber-800">
-            <ShieldCheck className="w-5 h-5 text-amber-500" />
+          <div className="mb-6 p-6 bg-amber-50 border border-amber-200 rounded-[32px] flex flex-col md:flex-row items-start md:items-center gap-6 text-amber-800">
+            <div className="p-3 bg-amber-100 rounded-2xl">
+              <ShieldCheck className="w-8 h-8 text-amber-500" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-black uppercase tracking-widest mb-1">Masalah Konfigurasi Firebase Admin</h3>
+              <p className="text-xs font-medium opacity-80 leading-relaxed">
+                Firebase Admin belum aktif. Ini diperlukan untuk menghapus akun Authentication secara permanen. 
+                Pastikan <code className="bg-amber-100 px-1 rounded font-bold">FIREBASE_SERVICE_ACCOUNT_KEY</code> sudah diatur di Environment Variables sebagai string JSON yang valid.
+              </p>
+              
+              {testResult && !testResult.success && (
+                <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-xl text-[10px] font-mono text-red-600 break-all">
+                  ERROR: {testResult.error}
+                </div>
+              )}
+            </div>
+            <button 
+              onClick={handleTestConfig}
+              disabled={isTesting}
+              className="w-full md:w-auto px-6 py-3 bg-amber-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isTesting ? "Testing..." : "Cek Koneksi"}
+            </button>
+          </div>
+        )}
+
+        {testResult?.success && (
+          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-800 animate-in fade-in slide-in-from-top-2">
+            <ShieldCheck className="w-5 h-5 text-emerald-500" />
             <div className="text-xs font-bold">
-              <p className="uppercase tracking-widest mb-1">Peringatan Konfigurasi</p>
-              <p className="opacity-80">Firebase Admin belum dikonfigurasi. Penghapusan akun Authentication tidak akan berfungsi. Harap atur <code className="bg-amber-100 px-1 rounded">FIREBASE_SERVICE_ACCOUNT_KEY</code> di Environment Variables.</p>
+              <p className="uppercase tracking-widest">Konfigurasi Berhasil</p>
+              <p className="opacity-80">Firebase Admin SDK terhubung dengan sukses!</p>
             </div>
           </div>
         )}

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useAuth, Role } from "@/contexts/AuthContext";
 import { GraduationCap, BookOpen } from "lucide-react";
 
-const SUBJECTS = ["Matematika", "Sains", "Sejarah", "Bahasa", "Informatika", "Seni"];
+const SUBJECTS = ["Matematika", "IPA", "IPS", "Bahasa Indonesia", "Bahasa Inggris", "Bahasa Jawa", "Pendidikan Kewarganegaraan", "Agama Islam", "Agama Kristen", "Agama Katholik", "Agama Hindu", "Agama Budha", "PJOK", "Informatika", "Koding dan KA", "Seni Budaya", "Prakarya"];
 
 export default function Onboarding() {
   const { setRole, userData } = useAuth();

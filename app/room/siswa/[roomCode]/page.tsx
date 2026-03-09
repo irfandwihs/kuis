@@ -127,6 +127,7 @@ export default function SiswaRoom() {
                 siswaName: userData.displayName || "Anonymous",
                 avatar: userData.avatar || "0:0:0",
                 studentClass: userData.studentClass || "-",
+                studentAbsen: userData.studentAbsen || "-",
                 score: 0,
                 progress: 0,
                 totalQuestions: shuffled.length,
@@ -143,7 +144,7 @@ export default function SiswaRoom() {
   }, [roomCode, quiz, userData?.uid, userData?.displayName, userData?.avatar, userData?.studentClass, userData?.inventory]);
 
   const handleAnswer = async (optionIndex: number) => {
-    if (isAnswering || feedback) return;
+    if (isAnswering || feedback || answers[currentQuestionIdx] !== undefined) return;
     
     setIsAnswering(true);
     const currentQ = questions[currentQuestionIdx];
@@ -701,7 +702,7 @@ export default function SiswaRoom() {
                 return (
                   <motion.button
                     key={idx}
-                    disabled={isAnswering || feedback !== null}
+                    disabled={isAnswering || feedback !== null || isRemoved || answers[currentQuestionIdx] !== undefined}
                     onClick={() => handleAnswer(idx)}
                     animate={{
                       left: path.x,
@@ -767,7 +768,7 @@ export default function SiswaRoom() {
                   return (
                     <button
                       key={idx}
-                      disabled={isAnswering || feedback !== null}
+                      disabled={isAnswering || feedback !== null || answers[currentQuestionIdx] !== undefined}
                       onClick={() => handleAnswer(idx)}
                       className={`p-8 md:p-12 rounded-[32px] text-center font-black text-2xl md:text-4xl transition-all border-4 active:scale-95 uppercase tracking-widest shadow-lg ${tfClass}`}
                     >
@@ -779,7 +780,7 @@ export default function SiswaRoom() {
                 return (
                   <button
                     key={idx}
-                    disabled={isAnswering || feedback !== null || isRemoved}
+                    disabled={isAnswering || feedback !== null || isRemoved || answers[currentQuestionIdx] !== undefined}
                     onClick={() => handleAnswer(idx)}
                     className={`p-5 md:p-6 rounded-2xl text-left font-bold text-base md:text-lg transition-all border-2 active:scale-95 ${buttonClass}`}
                   >

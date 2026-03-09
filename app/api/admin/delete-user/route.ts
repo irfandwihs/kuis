@@ -17,14 +17,29 @@ export async function POST(request: Request) {
     }
 
     // Verify the requester is the admin
-    const decodedToken = await auth.verifyIdToken(idToken);
+    let decodedToken;
+    try {
+      decodedToken = await auth.verifyIdToken(idToken);
+    } catch (verifyError: any) {
+      console.error('Error verifying ID token:', verifyError);
+      return NextResponse.json({ 
+        error: `Gagal memverifikasi token admin: ${verifyError.message}. Ini biasanya terjadi jika FIREBASE_SERVICE_ACCOUNT_KEY salah atau kadaluwarsa.` 
+      }, { status: 401 });
+    }
     
     if (decodedToken.email !== ADMIN_EMAIL) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+      return NextResponse.json({ error: 'Unauthorized: Email tidak terdaftar sebagai admin.' }, { status: 403 });
     }
 
     // Delete the user from Authentication
-    await auth.deleteUser(uid);
+    try {
+      await auth.deleteUser(uid);
+    } catch (deleteError: any) {
+      console.error('Error deleting user from Auth:', deleteError);
+      return NextResponse.json({ 
+        error: `Gagal menghapus user dari Authentication: ${deleteError.message}. Periksa apakah Service Account memiliki izin 'Firebase Authentication Admin'.` 
+      }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

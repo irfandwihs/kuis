@@ -1,8 +1,7 @@
 "use client";
 
-import { motion } from "motion/react";
 import { User } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 interface AvatarProps {
   avatarString?: string;
@@ -16,20 +15,30 @@ const CAPYBARA_POSITIONS = [
   "0% 100%", "50% 100%", "100% 100%"
 ];
 
+// ==========================================
+// PENGATURAN URL AVATAR EKSTERNAL
+// ==========================================
+// 1. Unggah file capybara.png Anda ke GitHub.
+// 2. Buka file tersebut di GitHub, klik tombol "Download" atau "Raw".
+// 3. Salin URL-nya dan tempelkan di dalam tanda kutip di bawah ini.
+// Contoh: const GITHUB_RAW_URL = "https://raw.githubusercontent.com/akun/repo/main/capybara.png";
+const GITHUB_RAW_URL: string = "https://raw.githubusercontent.com/irfandwihs/kuis/refs/heads/master/public/capybara.png"; 
+
 export default function Avatar({ avatarString = "0", size = "md", className = "" }: AvatarProps) {
   const [imageError, setImageError] = useState(false);
-  const [lastAvatar, setLastAvatar] = useState(avatarString);
+  const [prevAvatarString, setPrevAvatarString] = useState(avatarString);
 
-  if (lastAvatar !== avatarString) {
-    setLastAvatar(avatarString);
+  // Reset image error if avatar string changes
+  if (avatarString !== prevAvatarString) {
+    setPrevAvatarString(avatarString);
     setImageError(false);
   }
 
   const safeAvatarString = avatarString || "0";
-  // If the old format (e.g. "0:0:0") is passed, fallback to 0
   const avatarIdx = safeAvatarString.includes(":") ? 0 : parseInt(safeAvatarString, 10);
-  const position = CAPYBARA_POSITIONS[avatarIdx] || CAPYBARA_POSITIONS[0];
   
+  const position = CAPYBARA_POSITIONS[avatarIdx] || CAPYBARA_POSITIONS[0];
+
   const sizeClasses = {
     sm: "w-8 h-8",
     md: "w-12 h-12",
@@ -44,38 +53,58 @@ export default function Avatar({ avatarString = "0", size = "md", className = ""
     xl: "w-16 h-16"
   };
 
+  // Jika GITHUB_RAW_URL diisi, gunakan itu (mode spritesheet). 
+  // Jika kosong, gunakan DiceBear API yang dijamin 100% muncul di semua perangkat.
+  const isUsingSpritesheet = GITHUB_RAW_URL !== "";
+  const finalImageUrl = isUsingSpritesheet 
+    ? GITHUB_RAW_URL 
+    : `https://api.dicebear.com/9.x/bottts-neutral/svg?seed=${safeAvatarString}&backgroundColor=ffdfbf`;
+
   return (
     <div 
       className={`relative flex items-center justify-center rounded-2xl shadow-inner overflow-hidden bg-brand-cream/50 ${sizeClasses[size]} ${className}`}
     >
       {!imageError ? (
-        <div 
-          className="w-full h-full"
-          style={{
-            backgroundImage: "url('/capybara.png')",
-            backgroundSize: "300% 300%",
-            backgroundPosition: position,
-            backgroundRepeat: "no-repeat"
-          }}
-          onError={() => setImageError(true)}
-        />
+        <>
+          {isUsingSpritesheet ? (
+            <>
+              <div 
+                className="w-full h-full absolute inset-0 z-10"
+                style={{
+                  backgroundImage: `url('${finalImageUrl}')`,
+                  backgroundSize: "300% 300%",
+                  backgroundPosition: position,
+                  backgroundRepeat: "no-repeat"
+                }}
+              />
+              {/* Hidden standard img tag to detect load error and force referrer policy */}
+              <img 
+                src={finalImageUrl}
+                alt=""
+                className="hidden"
+                referrerPolicy="no-referrer"
+                onError={() => setImageError(true)}
+              />
+            </>
+          ) : (
+            <img 
+              src={finalImageUrl}
+              alt="Avatar"
+              className="w-full h-full object-cover z-10"
+              referrerPolicy="no-referrer"
+              onError={() => setImageError(true)}
+            />
+          )}
+        </>
       ) : (
-        <div className="w-full h-full flex items-center justify-center bg-brand-navy/5">
+        <div className="w-full h-full flex items-center justify-center bg-brand-navy/5 z-10">
           <User className={`${iconSizes[size]} text-brand-navy/20`} />
         </div>
       )}
       
-      {/* Hidden img tag to detect load error for backgroundImage */}
-      <img 
-        src="/capybara.png" 
-        className="hidden" 
-        onError={() => setImageError(true)} 
-        alt=""
-      />
-
-      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-2xl pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-2xl pointer-events-none z-20" />
     </div>
   );
 }
 
-export { CAPYBARA_POSITIONS };
+export { CAPYBARA_POSITIONS, GITHUB_RAW_URL };
