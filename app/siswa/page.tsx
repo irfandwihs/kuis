@@ -666,9 +666,6 @@ export default function SiswaDashboard() {
                           }`}
                         >
                           <Avatar avatarString={exp.id} size="sm" />
-                          <span className="text-[8px] font-black uppercase tracking-tighter">
-                            {exp.label}
-                          </span>
                         </button>
                       ))}
                     </div>
