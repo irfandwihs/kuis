@@ -1,7 +1,8 @@
 "use client";
 
 import { User } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Image from "next/image";
 
 interface AvatarProps {
   avatarString?: string;
@@ -22,7 +23,7 @@ const CAPYBARA_POSITIONS = [
 // 2. Buka file tersebut di GitHub, klik tombol "Download" atau "Raw".
 // 3. Salin URL-nya dan tempelkan di dalam tanda kutip di bawah ini.
 // Contoh: const GITHUB_RAW_URL = "https://raw.githubusercontent.com/akun/repo/main/capybara.png";
-const GITHUB_RAW_URL: string = "https://raw.githubusercontent.com/irfandwihs/kuis/refs/heads/master/public/capybara.png"; 
+const GITHUB_RAW_URL: string = "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/capybara.png"; 
 
 export default function Avatar({ avatarString = "0", size = "md", className = "" }: AvatarProps) {
   const [imageError, setImageError] = useState(false);
@@ -78,22 +79,29 @@ export default function Avatar({ avatarString = "0", size = "md", className = ""
                 }}
               />
               {/* Hidden standard img tag to detect load error and force referrer policy */}
-              <img 
+              <Image 
                 src={finalImageUrl}
                 alt=""
+                width={1}
+                height={1}
+                unoptimized
                 className="hidden"
                 referrerPolicy="no-referrer"
                 onError={() => setImageError(true)}
               />
             </>
           ) : (
-            <img 
-              src={finalImageUrl}
-              alt="Avatar"
-              className="w-full h-full object-cover z-10"
-              referrerPolicy="no-referrer"
-              onError={() => setImageError(true)}
-            />
+            <div className="w-full h-full relative z-10">
+              <Image 
+                src={finalImageUrl}
+                alt="Avatar"
+                fill
+                unoptimized
+                className="object-cover"
+                referrerPolicy="no-referrer"
+                onError={() => setImageError(true)}
+              />
+            </div>
           )}
         </>
       ) : (

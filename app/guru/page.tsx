@@ -385,6 +385,9 @@ export default function GuruDashboard() {
   const generateQuizWithAI = async () => {
     if (!topic || !userData?.subject) return;
 
+    // Ensure numQuestions is a valid number
+    const finalNumQuestions = isNaN(numQuestions) || numQuestions < 1 ? 5 : numQuestions;
+
     // Collect all available Gemini API keys for rotation
     const apiKeys = [
       process.env.NEXT_PUBLIC_GEMINI_API_KEY,
@@ -413,14 +416,14 @@ export default function GuruDashboard() {
         let optionsDescription = "";
 
         if (quizType === "true_false") {
-          prompt = `Buatlah kuis Benar/Salah tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${numQuestions} pernyataan. Untuk setiap pertanyaan, berikan sebuah pernyataan. Pilihan jawaban (options) HARUS selalu ["Benar", "Salah"]. correctAnswerIndex adalah 0 jika pernyataan itu benar, dan 1 jika pernyataan itu salah.`;
+          prompt = `Buatlah kuis Benar/Salah tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pernyataan. Untuk setiap pertanyaan, berikan sebuah pernyataan. Pilihan jawaban (options) HARUS selalu ["Benar", "Salah"]. correctAnswerIndex adalah 0 jika pernyataan itu benar, dan 1 jika pernyataan itu salah.`;
           optionsDescription = 'Exactly 2 options: ["Benar", "Salah"]';
         } else if (quizType === "hidden_word") {
-          prompt = `Buatlah kuis pilihan ganda tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${numQuestions} pertanyaan. Berikan 4 pilihan jawaban untuk setiap pertanyaan. SELAIN ITU, berikan satu KATA RAHASIA (hiddenWord) yang berkaitan erat dengan topik ${topic}. Kata rahasia ini sebaiknya terdiri dari 5 hingga 10 huruf tanpa spasi, gunakan huruf kapital semua.`;
+          prompt = `Buatlah kuis pilihan ganda tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pertanyaan. Berikan 4 pilihan jawaban untuk setiap pertanyaan. SELAIN ITU, berikan satu KATA RAHASIA (hiddenWord) yang berkaitan erat dengan topik ${topic}. Kata rahasia ini sebaiknya terdiri dari 5 hingga 10 huruf tanpa spasi, gunakan huruf kapital semua.`;
           optionsDescription = "Exactly 4 options";
         } else {
           // Both multiple_choice and duck_hunt use 4 options
-          prompt = `Buatlah kuis pilihan ganda tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${numQuestions} pertanyaan. Berikan 4 pilihan jawaban untuk setiap pertanyaan.`;
+          prompt = `Buatlah kuis pilihan ganda tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pertanyaan. Berikan 4 pilihan jawaban untuk setiap pertanyaan.`;
           optionsDescription = "Exactly 4 options";
         }
 
@@ -725,8 +728,11 @@ export default function GuruDashboard() {
                       type="number"
                       min="1"
                       max="20"
-                      value={numQuestions}
-                      onChange={(e) => setNumQuestions(parseInt(e.target.value))}
+                      value={isNaN(numQuestions) ? "" : numQuestions}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        setNumQuestions(val);
+                      }}
                       className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none transition-all font-bold text-brand-navy text-sm"
                     />
                   </div>
@@ -1475,11 +1481,11 @@ export default function GuruDashboard() {
                           </div>
                           <Avatar avatarString={student.avatar} size="md" />
                           <div>
-                            <p className="font-black text-brand-navy text-lg leading-tight">
+                            <h3 className="font-black text-brand-navy text-base leading-tight">
                               {student.displayName}
-                            </p>
-                            <p className="text-[10px] font-bold text-brand-navy/40 uppercase tracking-widest">
-                              Kelas {student.studentClass || "-"} • No Absen {student.studentAbsen || "-"}
+                            </h3>
+                            <p className="text-xs font-bold text-brand-orange uppercase tracking-wider">
+                              {student.studentClass || "-"} - {student.studentAbsen || "-"}
                             </p>
                           </div>
                         </div>

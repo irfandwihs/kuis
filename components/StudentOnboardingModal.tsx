@@ -9,15 +9,15 @@ import Avatar, { CAPYBARA_POSITIONS, GITHUB_RAW_URL } from "./Avatar";
 export default function StudentOnboardingModal() {
   const { userData, updateProfile } = useAuth();
   const [name, setName] = useState(userData?.displayName || "");
-  const [studentClass, setStudentClass] = useState("");
-  const [studentAbsen, setStudentAbsen] = useState("");
+  const [studentClass, setStudentClass] = useState(userData?.studentClass || "");
+  const [studentAbsen, setStudentAbsen] = useState(userData?.studentAbsen || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Character Creator State
   const [avatarIdx, setAvatarIdx] = useState(0);
 
-  // If profile is already completed, don't show
-  if (userData?.profileCompleted) return null;
+  // If profile is already completed and has absence number, don't show
+  if (userData?.profileCompleted && userData?.studentAbsen) return null;
 
   const avatarString = avatarIdx.toString();
 

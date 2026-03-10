@@ -146,7 +146,7 @@ export default function RaceMode() {
                           
                           {/* Name Tag */}
                           <div className="absolute -bottom-5 md:-bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap bg-black/80 px-1.5 py-0.5 rounded text-[7px] md:text-[10px] font-black text-white tracking-wider border border-white/10">
-                            {racer.siswaName.split(' ')[0]}
+                            {racer.siswaName.split(' ')[0]} {racer.studentAbsen && `(${racer.studentAbsen})`}
                           </div>
                         </div>
                       </motion.div>

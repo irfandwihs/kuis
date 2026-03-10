@@ -110,7 +110,7 @@ export default function SiswaDashboard() {
             <div>
               <h1 className="text-xl font-black text-brand-navy tracking-tight">{userData.displayName}</h1>
               <p className="text-brand-navy/60 text-xs font-bold uppercase tracking-wider">
-                Level {level} • {userData.studentClass || "Siswa"}
+                Level {level} • {userData.studentClass || "Siswa"} {userData.studentAbsen ? `• No Absen ${userData.studentAbsen}` : ""}
               </p>
             </div>
           </div>

@@ -141,7 +141,7 @@ export default function SiswaRoom() {
     });
 
     return () => unsubscribe();
-  }, [roomCode, quiz, userData?.uid, userData?.displayName, userData?.avatar, userData?.studentClass, userData?.inventory]);
+  }, [roomCode, quiz, userData?.uid, userData?.displayName, userData?.avatar, userData?.studentClass, userData?.studentAbsen, userData?.inventory]);
 
   const handleAnswer = async (optionIndex: number) => {
     if (isAnswering || feedback || answers[currentQuestionIdx] !== undefined) return;
