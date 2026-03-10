@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "motion/react";
 import { User, GraduationCap, Check, Sparkles } from "lucide-react";
-import Avatar, { CAPYBARA_POSITIONS, GITHUB_RAW_URL } from "./Avatar";
+import Avatar, { AVATAR_IMAGES } from "./Avatar";
+import Image from "next/image";
 
 export default function StudentOnboardingModal() {
   const { userData, updateProfile } = useAuth();
@@ -50,14 +51,14 @@ export default function StudentOnboardingModal() {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[100] flex items-start md:items-center justify-center p-4 bg-brand-navy/80 backdrop-blur-md overflow-y-auto">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-navy/80 backdrop-blur-md overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, scale: 0.9, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          className="bg-white w-full max-w-4xl rounded-[32px] md:rounded-[48px] shadow-2xl overflow-hidden border border-white/20 flex flex-col md:flex-row my-auto"
+          className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[32px] md:rounded-[48px] shadow-2xl overflow-hidden border border-white/20 flex flex-col md:flex-row my-auto"
         >
           {/* Left Side: Preview */}
-          <div className="bg-brand-navy p-6 md:p-8 md:w-2/5 flex flex-col items-center justify-center text-center relative">
+          <div className="bg-brand-navy p-6 md:p-8 md:w-2/5 flex flex-col items-center justify-center text-center relative shrink-0">
             <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
               <div className="absolute top-4 left-4 rotate-12"><Sparkles className="w-8 h-8 text-white" /></div>
               <div className="absolute bottom-4 right-4 -rotate-12"><GraduationCap className="w-8 h-8 text-white" /></div>
@@ -73,7 +74,7 @@ export default function StudentOnboardingModal() {
           </div>
 
           {/* Right Side: Controls */}
-          <div className="flex-1 p-6 md:p-10 flex flex-col">
+          <div className="flex-1 p-6 md:p-10 flex flex-col overflow-y-auto">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
@@ -140,7 +141,7 @@ export default function StudentOnboardingModal() {
                   Pilih Capybara
                 </label>
                 <div className="grid grid-cols-3 gap-3 md:gap-4">
-                  {CAPYBARA_POSITIONS.map((pos, idx) => (
+                  {AVATAR_IMAGES.map((url, idx) => (
                     <button
                       key={idx}
                       type="button"
@@ -151,14 +152,13 @@ export default function StudentOnboardingModal() {
                           : "border-transparent hover:border-brand-orange/30 hover:scale-105"
                       }`}
                     >
-                      <div 
-                        className="w-full h-full"
-                        style={{
-                          backgroundImage: `url('${GITHUB_RAW_URL}')`,
-                          backgroundSize: "300% 300%",
-                          backgroundPosition: pos,
-                          backgroundRepeat: "no-repeat"
-                        }}
+                      <Image 
+                        src={url}
+                        alt={`Avatar ${idx}`}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                        referrerPolicy="no-referrer"
                       />
                     </button>
                   ))}

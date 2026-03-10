@@ -95,7 +95,7 @@ export default function GuruDashboard() {
   const [topic, setTopic] = useState("");
   const [numQuestions, setNumQuestions] = useState(5);
   const [quizType, setQuizType] = useState<
-    "multiple_choice" | "true_false" | "duck_hunt" | "hidden_word"
+    "multiple_choice" | "true_false" | "duck_hunt" | "hidden_word" | "mixed_1" | "mixed_2"
   >("multiple_choice");
   const [viewingQuiz, setViewingQuiz] = useState<Quiz | null>(null);
   const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
@@ -124,7 +124,10 @@ export default function GuruDashboard() {
   const [isCreatingManualQuiz, setIsCreatingManualQuiz] = useState(false);
   const [manualQuizTitle, setManualQuizTitle] = useState("");
   const [manualQuizType, setManualQuizType] = useState<
-    "multiple_choice" | "true_false" | "duck_hunt" | "hidden_word"
+    "multiple_choice" | "true_false" | "duck_hunt" | "hidden_word" | "mixed_1" | "mixed_2"
+  >("multiple_choice");
+  const [currentManualQuestionType, setCurrentManualQuestionType] = useState<
+    "multiple_choice" | "true_false" | "duck_hunt"
   >("multiple_choice");
   const [manualHiddenWord, setManualHiddenWord] = useState("");
   const [manualQuestions, setManualQuestions] = useState<any[]>([]);
@@ -421,6 +424,12 @@ export default function GuruDashboard() {
         } else if (quizType === "hidden_word") {
           prompt = `Buatlah kuis pilihan ganda tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pertanyaan. Berikan 4 pilihan jawaban untuk setiap pertanyaan. SELAIN ITU, berikan satu KATA RAHASIA (hiddenWord) yang berkaitan erat dengan topik ${topic}. Kata rahasia ini sebaiknya terdiri dari 5 hingga 10 huruf tanpa spasi, gunakan huruf kapital semua.`;
           optionsDescription = "Exactly 4 options";
+        } else if (quizType === "mixed_1") {
+          prompt = `Buatlah kuis campuran tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pertanyaan. Campurkan pertanyaan pilihan ganda (4 pilihan) dan pertanyaan Benar/Salah (2 pilihan: ["Benar", "Salah"]). Untuk setiap pertanyaan, tentukan 'type' sebagai 'multiple_choice' atau 'true_false'.`;
+          optionsDescription = 'Either 4 options or exactly 2 options: ["Benar", "Salah"]';
+        } else if (quizType === "mixed_2") {
+          prompt = `Buatlah kuis campuran tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pertanyaan. Campurkan pertanyaan pilihan ganda (4 pilihan), pertanyaan Benar/Salah (2 pilihan: ["Benar", "Salah"]), dan pertanyaan berburu bebek (4 pilihan). Untuk setiap pertanyaan, tentukan 'type' sebagai 'multiple_choice', 'true_false', atau 'duck_hunt'.`;
+          optionsDescription = 'Either 4 options or exactly 2 options: ["Benar", "Salah"]';
         } else {
           // Both multiple_choice and duck_hunt use 4 options
           prompt = `Buatlah kuis pilihan ganda tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pertanyaan. Berikan 4 pilihan jawaban untuk setiap pertanyaan.`;
@@ -452,6 +461,17 @@ export default function GuruDashboard() {
             },
           },
         };
+
+        if (quizType === "mixed_1" || quizType === "mixed_2") {
+          schemaProperties.questions.items.properties.type = {
+            type: Type.STRING,
+            description: quizType === "mixed_1" 
+              ? "The type of question: 'multiple_choice' or 'true_false'" 
+              : "The type of question: 'multiple_choice', 'true_false', or 'duck_hunt'",
+          };
+          schemaProperties.questions.items.required.push("type");
+        }
+
         const schemaRequired = ["title", "questions"];
 
         if (quizType === "hidden_word") {
@@ -759,6 +779,8 @@ export default function GuruDashboard() {
                       <option value="true_false">Benar / Salah (Buzzer)</option>
                       <option value="duck_hunt">Berburu Bebek (Duck Hunt)</option>
                       <option value="hidden_word">Tebak Kata Tersembunyi</option>
+                      <option value="mixed_1">Campuran 1 (Klasik + Benar/Salah)</option>
+                      <option value="mixed_2">Campuran 2 (Klasik + B/S + Bebek)</option>
                     </select>
                   </div>
                 </div>
@@ -865,7 +887,11 @@ export default function GuruDashboard() {
                               ? "Duck Hunt"
                               : quiz.quizType === "hidden_word"
                                 ? "Kata Tersembunyi"
-                                : "Pilihan Ganda"}
+                                : quiz.quizType === "mixed_1"
+                                  ? "Campuran 1"
+                                  : quiz.quizType === "mixed_2"
+                                    ? "Campuran 2"
+                                    : "Pilihan Ganda"}
                         </p>
                         {quiz.quizType === "hidden_word" && quiz.hiddenWord && (
                           <p className="text-[10px] text-brand-orange font-black uppercase tracking-widest">
@@ -1889,6 +1915,10 @@ export default function GuruDashboard() {
                         if (type === "true_false") {
                           setCurrentManualOptions(["Benar", "Salah"]);
                           setCurrentManualCorrectIdx(0);
+                        } else if (type === "mixed_1" || type === "mixed_2") {
+                          setCurrentManualQuestionType("multiple_choice");
+                          setCurrentManualOptions(["", "", "", ""]);
+                          setCurrentManualCorrectIdx(0);
                         } else {
                           setCurrentManualOptions(["", "", "", ""]);
                           setCurrentManualCorrectIdx(0);
@@ -1902,6 +1932,8 @@ export default function GuruDashboard() {
                       <option value="hidden_word">
                         Tebak Kata Tersembunyi
                       </option>
+                      <option value="mixed_1">Campuran 1 (Klasik + Benar/Salah)</option>
+                      <option value="mixed_2">Campuran 2 (Klasik + B/S + Bebek)</option>
                     </select>
                   </div>
                   {manualQuizType === "hidden_word" && (
@@ -1935,9 +1967,14 @@ export default function GuruDashboard() {
                         key={idx}
                         className="p-3 bg-white rounded-xl border border-brand-navy/5 text-xs font-bold text-brand-navy flex justify-between items-center group"
                       >
-                        <span className="truncate pr-2">
-                          {idx + 1}. {q.question}
-                        </span>
+                        <div className="truncate pr-2 flex flex-col">
+                          <span>{idx + 1}. {q.question}</span>
+                          {(manualQuizType === "mixed_1" || manualQuizType === "mixed_2") && q.type && (
+                            <span className="text-[8px] text-brand-orange uppercase tracking-widest mt-0.5">
+                              {q.type === "true_false" ? "Benar/Salah" : q.type === "duck_hunt" ? "Berburu Bebek" : "Pilihan Ganda"}
+                            </span>
+                          )}
+                        </div>
                         <button
                           onClick={() => {
                             const newQ = [...manualQuestions];
@@ -1965,6 +2002,34 @@ export default function GuruDashboard() {
                   Tambah Soal Baru
                 </h3>
                 <div className="space-y-4 flex-1">
+                  {(manualQuizType === "mixed_1" || manualQuizType === "mixed_2") && (
+                    <div>
+                      <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
+                        Tipe Soal Ini
+                      </label>
+                      <select
+                        value={currentManualQuestionType}
+                        onChange={(e) => {
+                          const type = e.target.value as any;
+                          setCurrentManualQuestionType(type);
+                          if (type === "true_false") {
+                            setCurrentManualOptions(["Benar", "Salah"]);
+                            setCurrentManualCorrectIdx(0);
+                          } else {
+                            setCurrentManualOptions(["", "", "", ""]);
+                            setCurrentManualCorrectIdx(0);
+                          }
+                        }}
+                        className="w-full p-3 bg-white border-2 border-transparent rounded-xl focus:border-brand-orange outline-none font-bold text-brand-navy text-sm appearance-none cursor-pointer"
+                      >
+                        <option value="multiple_choice">Pilihan Ganda</option>
+                        <option value="true_false">Benar / Salah</option>
+                        {manualQuizType === "mixed_2" && (
+                          <option value="duck_hunt">Berburu Bebek</option>
+                        )}
+                      </select>
+                    </div>
+                  )}
                   <div>
                     <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
                       Pertanyaan
@@ -1998,7 +2063,7 @@ export default function GuruDashboard() {
                           <input
                             type="text"
                             value={opt}
-                            disabled={manualQuizType === "true_false"}
+                            disabled={manualQuizType === "true_false" || ((manualQuizType === "mixed_1" || manualQuizType === "mixed_2") && currentManualQuestionType === "true_false")}
                             onChange={(e) => {
                               const newOpts = [...currentManualOptions];
                               newOpts[idx] = e.target.value;
@@ -2009,7 +2074,7 @@ export default function GuruDashboard() {
                               currentManualCorrectIdx === idx
                                 ? "text-emerald-700 border-emerald-200 bg-emerald-50"
                                 : "text-brand-navy"
-                            } ${manualQuizType === "true_false" ? "opacity-70 cursor-not-allowed" : ""}`}
+                            } ${(manualQuizType === "true_false" || ((manualQuizType === "mixed_1" || manualQuizType === "mixed_2") && currentManualQuestionType === "true_false")) ? "opacity-70 cursor-not-allowed" : ""}`}
                           />
                         </div>
                       ))}
@@ -2030,12 +2095,20 @@ export default function GuruDashboard() {
                         question: currentManualQuestion,
                         options: [...currentManualOptions],
                         correctAnswerIndex: currentManualCorrectIdx,
+                        ...(manualQuizType === "mixed_1" || manualQuizType === "mixed_2" ? { type: currentManualQuestionType } : {}),
                       },
                     ]);
 
                     setCurrentManualQuestion("");
-                    if (manualQuizType !== "true_false") {
+                    if (manualQuizType !== "true_false" && currentManualQuestionType !== "true_false") {
                       setCurrentManualOptions(["", "", "", ""]);
+                    } else if (manualQuizType === "mixed_1" || manualQuizType === "mixed_2") {
+                       // Keep the options logic consistent with current type
+                       if (currentManualQuestionType === "true_false") {
+                         setCurrentManualOptions(["Benar", "Salah"]);
+                       } else {
+                         setCurrentManualOptions(["", "", "", ""]);
+                       }
                     }
                     setCurrentManualCorrectIdx(0);
                   }}
@@ -2345,6 +2418,30 @@ export default function GuruDashboard() {
           </div>
         </div>
       )}
+
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-brand-navy/10 flex justify-around items-center p-4 pb-safe z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] rounded-t-3xl">
+        <button onClick={() => setMainTab("beranda")} className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "beranda" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}>
+          <Home className={`w-6 h-6 ${mainTab === "beranda" ? "fill-current" : ""}`} />
+          <span className="text-[10px] font-black uppercase tracking-widest">Beranda</span>
+        </button>
+        <button onClick={() => setMainTab("kuis")} className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "kuis" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}>
+          <Play className={`w-6 h-6 ${mainTab === "kuis" ? "fill-current" : ""}`} />
+          <span className="text-[10px] font-black uppercase tracking-widest">Kuis</span>
+        </button>
+        <button onClick={() => setMainTab("tugas")} className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "tugas" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}>
+          <FileText className={`w-6 h-6 ${mainTab === "tugas" ? "fill-current" : ""}`} />
+          <span className="text-[10px] font-black uppercase tracking-widest">Tugas</span>
+        </button>
+        <button onClick={() => setMainTab("materi")} className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "materi" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}>
+          <BookOpen className={`w-6 h-6 ${mainTab === "materi" ? "fill-current" : ""}`} />
+          <span className="text-[10px] font-black uppercase tracking-widest">Materi</span>
+        </button>
+        <button onClick={() => setMainTab("analitik")} className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "analitik" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}>
+          <BarChart2 className={`w-6 h-6 ${mainTab === "analitik" ? "fill-current" : ""}`} />
+          <span className="text-[10px] font-black uppercase tracking-widest">Analitik</span>
+        </button>
+      </nav>
     </div>
   );
 }

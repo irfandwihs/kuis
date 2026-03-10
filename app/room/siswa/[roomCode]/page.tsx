@@ -582,6 +582,7 @@ export default function SiswaRoom() {
   if (questions.length === 0) return null;
 
   const currentQ = questions[currentQuestionIdx];
+  const currentQuestionType = currentQ?.type || quiz?.quizType;
   const isLastQuestion = currentQuestionIdx === questions.length - 1;
 
   const shakeAnimation = {
@@ -611,7 +612,7 @@ export default function SiswaRoom() {
               <button
                 key={itemId}
                 onClick={() => handleUseItem(itemId)}
-                disabled={count <= 0 || (itemId === "phoenix_feather") || isActive || feedback !== null || (itemId === "clear_answers" && quiz?.quizType === "true_false")}
+                disabled={count <= 0 || (itemId === "phoenix_feather") || isActive || feedback !== null || (itemId === "clear_answers" && currentQuestionType === "true_false")}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all border-2 ${
                   isActive 
                     ? "bg-brand-orange text-white border-brand-orange shadow-lg" 
@@ -674,7 +675,7 @@ export default function SiswaRoom() {
             {currentQ.question}
           </h2>
 
-          {quiz?.quizType === "duck_hunt" ? (
+          {currentQuestionType === "duck_hunt" ? (
             <div className="relative w-full h-[400px] md:h-[500px] bg-[#5c94fc] rounded-3xl overflow-hidden border-8 border-black shadow-inner" style={{ imageRendering: 'pixelated' }}>
               {/* Pixel Clouds */}
               <div className="absolute top-12 left-12 w-16 h-8 bg-white" style={{ boxShadow: '8px 8px 0 0 white, 16px 0 0 0 white, -8px 8px 0 0 white' }} />
@@ -736,7 +737,7 @@ export default function SiswaRoom() {
               })}
             </div>
           ) : (
-            <div className={`grid gap-3 md:gap-4 ${quiz?.quizType === "true_false" ? "grid-cols-2" : "grid-cols-1"}`}>
+            <div className={`grid gap-3 md:gap-4 ${currentQuestionType === "true_false" ? "grid-cols-2" : "grid-cols-1"}`}>
               {currentQ.options.map((opt: string, idx: number) => {
                 const isSelected = answers[currentQuestionIdx] === idx;
                 const isCorrect = idx === currentQ.correctAnswerIndex;
@@ -754,7 +755,7 @@ export default function SiswaRoom() {
                   buttonClass = "border-brand-orange bg-brand-orange/5 text-brand-orange shadow-lg shadow-brand-orange/10";
                 }
 
-                if (quiz?.quizType === "true_false") {
+                if (currentQuestionType === "true_false") {
                   // Buzzer style for True/False
                   const isBenar = opt.toLowerCase() === "benar";
                   const baseColor = isBenar ? "emerald" : "red";
