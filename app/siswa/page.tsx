@@ -86,13 +86,12 @@ export default function SiswaDashboard() {
     const fetchData = async () => {
       if (!userData?.uid) return;
       try {
-        // 1. Fetch Global Leaderboard (Top 10 Siswa who have earned XP)
+        // 1. Fetch Global Leaderboard (All Siswa who have earned XP)
         const qLeaderboard = query(
           collection(db, "users"),
           where("role", "==", "Siswa"),
           where("xp", ">", 0),
-          orderBy("xp", "desc"),
-          limit(10),
+          orderBy("xp", "desc")
         );
         const snapshotLeaderboard = await getDocs(qLeaderboard);
         const users = snapshotLeaderboard.docs.map((doc) => ({
@@ -198,27 +197,6 @@ export default function SiswaDashboard() {
               </div>
             </div>
             <button
-              onClick={() => setMainTab("beranda")}
-              className={`p-2 transition-colors ${mainTab === "beranda" ? "text-brand-orange bg-brand-orange/10 rounded-xl" : "text-brand-navy/40 hover:text-brand-orange"}`}
-              title="Beranda"
-            >
-              <Home className="w-6 h-6" />
-            </button>
-            <button
-              onClick={() => setMainTab("tugas")}
-              className={`p-2 transition-colors ${mainTab === "tugas" ? "text-brand-orange bg-brand-orange/10 rounded-xl" : "text-brand-navy/40 hover:text-brand-orange"}`}
-              title="Tugas"
-            >
-              <FileText className="w-6 h-6" />
-            </button>
-            <button
-              onClick={() => setMainTab("profil")}
-              className={`p-2 transition-colors ${mainTab === "profil" ? "text-brand-orange bg-brand-orange/10 rounded-xl" : "text-brand-navy/40 hover:text-brand-orange"}`}
-              title="Pengaturan Profil"
-            >
-              <Settings className="w-6 h-6" />
-            </button>
-            <button
               onClick={logout}
               className="p-2 text-brand-navy/40 hover:text-brand-orange transition-colors"
               title="Keluar"
@@ -228,48 +206,50 @@ export default function SiswaDashboard() {
           </div>
         </header>
 
-        <div className="grid grid-cols-4 gap-3 mb-6">
-          <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center group hover:border-brand-orange transition-all">
-            <div className="p-2 bg-brand-orange/10 text-brand-orange rounded-xl mb-2 group-hover:scale-110 transition-transform">
-              <Trophy className="w-5 h-5" />
+        {mainTab === "beranda" && (
+          <div className="grid grid-cols-4 gap-3 mb-6">
+            <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center group hover:border-brand-orange transition-all">
+              <div className="p-2 bg-brand-orange/10 text-brand-orange rounded-xl mb-2 group-hover:scale-110 transition-transform">
+                <Trophy className="w-5 h-5" />
+              </div>
+              <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">
+                Peringkat
+              </div>
+              <div className="text-lg font-black text-brand-navy">{rank}</div>
             </div>
-            <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">
-              Peringkat
+            <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center group hover:border-brand-orange transition-all">
+              <div className="p-2 bg-brand-navy/10 text-brand-navy rounded-xl mb-2 group-hover:scale-110 transition-transform">
+                <Zap className="w-5 h-5" />
+              </div>
+              <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">
+                Total XP
+              </div>
+              <div className="text-lg font-black text-brand-navy">{xp}</div>
             </div>
-            <div className="text-lg font-black text-brand-navy">{rank}</div>
+            <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center">
+              <div className="p-2 bg-brand-orange/10 text-brand-orange rounded-xl mb-2">
+                <Star className="w-5 h-5" />
+              </div>
+              <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">
+                Quiz
+              </div>
+              <div className="text-lg font-black text-brand-navy">
+                {quizzesPlayed}
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center">
+              <div className="p-2 bg-sky-100 text-sky-500 rounded-xl mb-2">
+                <Diamond className="w-5 h-5 fill-current" />
+              </div>
+              <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">
+                Diamond
+              </div>
+              <div className="text-lg font-black text-brand-navy">
+                {userData.diamonds || 0}
+              </div>
+            </div>
           </div>
-          <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center group hover:border-brand-orange transition-all">
-            <div className="p-2 bg-brand-navy/10 text-brand-navy rounded-xl mb-2 group-hover:scale-110 transition-transform">
-              <Zap className="w-5 h-5" />
-            </div>
-            <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">
-              Total XP
-            </div>
-            <div className="text-lg font-black text-brand-navy">{xp}</div>
-          </div>
-          <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center">
-            <div className="p-2 bg-brand-orange/10 text-brand-orange rounded-xl mb-2">
-              <Star className="w-5 h-5" />
-            </div>
-            <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">
-              Quiz
-            </div>
-            <div className="text-lg font-black text-brand-navy">
-              {quizzesPlayed}
-            </div>
-          </div>
-          <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center">
-            <div className="p-2 bg-sky-100 text-sky-500 rounded-xl mb-2">
-              <Diamond className="w-5 h-5 fill-current" />
-            </div>
-            <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">
-              Diamond
-            </div>
-            <div className="text-lg font-black text-brand-navy">
-              {userData.diamonds || 0}
-            </div>
-          </div>
-        </div>
+        )}
 
         {mainTab === "beranda" && (
           <>

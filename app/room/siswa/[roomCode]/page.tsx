@@ -6,7 +6,7 @@ import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, i
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "motion/react";
-import { Gamepad2, Square, Trophy, Zap, Flame, Diamond, Sparkles, Ghost, Bird, BookOpen } from "lucide-react";
+import { Gamepad2, Square, Trophy, Zap, Flame, Diamond, Sparkles, Ghost, Bird, BookOpen, WifiOff, Loader2, X } from "lucide-react";
 import confetti from "canvas-confetti";
 
 // Utility to shuffle array
@@ -41,6 +41,10 @@ export default function SiswaRoom() {
   const [hiddenWordGuessed, setHiddenWordGuessed] = useState(false);
   const [hiddenWordResult, setHiddenWordResult] = useState<"correct" | "incorrect" | null>(null);
   const [isCheating, setIsCheating] = useState(false);
+  const [cheatMessage, setCheatMessage] = useState("");
+  const [cheatCount, setCheatCount] = useState(0);
+  const [isOffline, setIsOffline] = useState(false);
+  const [classError, setClassError] = useState<string | null>(null);
   
   // Item States
   const [inventory, setInventory] = useState<Record<string, number>>({});
@@ -48,6 +52,8 @@ export default function SiswaRoom() {
   const [phoenixFeatherUsed, setPhoenixFeatherUsed] = useState(0);
   const [removedOptions, setRemovedOptions] = useState<number[]>([]);
   const [usedItemsInSession, setUsedItemsInSession] = useState<string[]>([]);
+  const [incompleteSession, setIncompleteSession] = useState<any>(null);
+  const [showResumePrompt, setShowResumePrompt] = useState(false);
 
   const playSound = (type: "correct" | "incorrect" | "item") => {
     const audio = new Audio(
@@ -64,10 +70,52 @@ export default function SiswaRoom() {
   useEffect(() => {
     if (!room || room.status !== "playing" || submitted) return;
 
+    const triggerCheatAlarm = (message: string) => {
+      setIsCheating(true);
+      setCheatMessage(message);
+      setCheatCount(prev => prev + 1);
+
+      // Vibrate
+      if (navigator.vibrate) {
+        navigator.vibrate([500, 200, 500, 200, 500]);
+      }
+
+      // Play alarm sound
+      try {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContext) {
+          const ctx = new AudioContext();
+          const osc = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(800, ctx.currentTime);
+          osc.frequency.setValueAtTime(1200, ctx.currentTime + 0.2);
+          osc.frequency.setValueAtTime(800, ctx.currentTime + 0.4);
+          osc.frequency.setValueAtTime(1200, ctx.currentTime + 0.6);
+          osc.frequency.setValueAtTime(800, ctx.currentTime + 0.8);
+
+          gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+
+          osc.connect(gainNode);
+          gainNode.connect(ctx.destination);
+
+          osc.start();
+          osc.stop(ctx.currentTime + 1);
+        }
+      } catch (e) {
+        console.error("Audio API not supported", e);
+      }
+    };
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        setIsCheating(true);
+        triggerCheatAlarm("Sistem mendeteksi Anda meninggalkan halaman kuis. Harap kerjakan kuis dengan jujur dan jangan membuka tab atau aplikasi lain.");
       }
+    };
+
+    const handleBlur = () => {
+      triggerCheatAlarm("Sistem mendeteksi Anda membuka aplikasi/jendela lain. Harap fokus pada kuis!");
     };
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -75,12 +123,52 @@ export default function SiswaRoom() {
       e.returnValue = "";
     };
 
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      triggerCheatAlarm("Klik kanan dinonaktifkan untuk mencegah kecurangan.");
+    };
+
+    const handleCopy = (e: ClipboardEvent) => {
+      e.preventDefault();
+      triggerCheatAlarm("Menyalin teks tidak diizinkan selama kuis berlangsung.");
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevent PrintScreen, Ctrl+C, Meta+C
+      if (e.key === 'PrintScreen' || (e.ctrlKey && e.key === 'c') || (e.metaKey && e.key === 'c')) {
+        e.preventDefault();
+        // Clear clipboard just in case
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText('');
+        }
+        triggerCheatAlarm("Tangkapan layar atau menyalin teks tidak diizinkan!");
+      }
+    };
+
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+
+    // Initial check
+    setIsOffline(!navigator.onLine);
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleBlur);
     window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("copy", handleCopy);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleBlur);
       window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener("copy", handleCopy);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
   }, [room, submitted]);
 
@@ -91,13 +179,23 @@ export default function SiswaRoom() {
     const unsubscribe = onSnapshot(q, async (snapshot) => {
       if (!snapshot.empty) {
         const roomData: any = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+        
+        // Check Class Restriction
+        if (roomData.targetClass && roomData.targetClass !== "Semua Kelas") {
+          if (userData?.studentClass !== roomData.targetClass) {
+            setClassError(`Maaf, kuis ini hanya untuk Kelas ${roomData.targetClass}. Kamu berada di Kelas ${userData?.studentClass || "Tanpa Kelas"}.`);
+            return;
+          }
+        }
+        
         setRoom(roomData);
         
         // Check if student has already submitted for this room
+        let lbData: any = null;
         if (userData?.uid && roomData.id) {
           const lbDoc = await getDoc(doc(db, "rooms", roomData.id, "leaderboard", userData.uid));
           if (lbDoc.exists()) {
-            const lbData = lbDoc.data();
+            lbData = lbDoc.data();
             if (lbData.status === "finished") {
               setScore(lbData.score || 0);
               setSubmitted(true);
@@ -111,29 +209,50 @@ export default function SiswaRoom() {
             const quizData = quizDoc.data();
             setQuiz(quizData);
             
-            // Set inventory from userData
-            if (userData?.inventory) {
-              setInventory(userData.inventory);
-            }
+            if (lbData && lbData.status === "finished") {
+              // Just set questions for review
+              const shuffled = lbData.sessionData?.questions || quizData.questions;
+              setQuestions(shuffled);
+              if (lbData.sessionData?.answers) setAnswers(lbData.sessionData.answers);
+            } else if (lbData && lbData.status === "playing" && lbData.progress > 0 && lbData.sessionData) {
+              // Incomplete session detected
+              setIncompleteSession(lbData.sessionData);
+              setShowResumePrompt(true);
+            } else {
+              // Start fresh
+              if (userData?.inventory) {
+                setInventory(userData.inventory);
+              }
+              const shuffled = shuffleArray(quizData.questions.map((q: any, idx: number) => ({ ...q, originalIndex: idx })));
+              setQuestions(shuffled);
 
-            // Randomize questions for this specific student
-            const shuffled = shuffleArray(quizData.questions.map((q: any, idx: number) => ({ ...q, originalIndex: idx })));
-            setQuestions(shuffled);
-
-            // Initialize leaderboard entry for progress tracking
-            if (userData?.uid && roomData.id) {
-              await setDoc(doc(db, "rooms", roomData.id, "leaderboard", userData.uid), {
-                siswaId: userData.uid,
-                siswaName: userData.displayName || "Anonymous",
-                avatar: userData.avatar || "0:0:0",
-                studentClass: userData.studentClass || "-",
-                studentAbsen: userData.studentAbsen || "-",
-                score: 0,
-                progress: 0,
-                totalQuestions: shuffled.length,
-                status: "playing",
-                lastUpdate: new Date()
-              }, { merge: true });
+              if (userData?.uid && roomData.id) {
+                await setDoc(doc(db, "rooms", roomData.id, "leaderboard", userData.uid), {
+                  siswaId: userData.uid,
+                  siswaName: userData.displayName || "Anonymous",
+                  avatar: userData.avatar || "0:0:0",
+                  studentClass: userData.studentClass || "-",
+                  studentAbsen: userData.studentAbsen || "-",
+                  score: 0,
+                  progress: 0,
+                  totalQuestions: shuffled.length,
+                  status: "playing",
+                  lastUpdate: new Date(),
+                  sessionData: {
+                    questions: shuffled,
+                    answers: {},
+                    currentQuestionIdx: 0,
+                    score: 0,
+                    streak: 0,
+                    revealedIndices: [],
+                    inventory: userData?.inventory || {},
+                    usedItemsInSession: [],
+                    phoenixFeatherUsed: 0,
+                    isGoldenAppleActive: false,
+                    removedOptions: []
+                  }
+                }, { merge: true });
+              }
             }
           }
         }
@@ -142,6 +261,35 @@ export default function SiswaRoom() {
 
     return () => unsubscribe();
   }, [roomCode, quiz, userData?.uid, userData?.displayName, userData?.avatar, userData?.studentClass, userData?.studentAbsen, userData?.inventory]);
+
+  // Save session data whenever relevant state changes
+  useEffect(() => {
+    if (!room?.id || !userData?.uid || !quiz || submitted || Object.keys(answers).length === 0) return;
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        await setDoc(doc(db, "rooms", room.id, "leaderboard", userData.uid), {
+          sessionData: {
+            questions,
+            answers,
+            currentQuestionIdx,
+            score,
+            streak,
+            revealedIndices,
+            inventory,
+            usedItemsInSession,
+            phoenixFeatherUsed,
+            isGoldenAppleActive,
+            removedOptions
+          }
+        }, { merge: true });
+      } catch (e) {
+        console.error("Failed to save session", e);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [answers, currentQuestionIdx, score, streak, revealedIndices, inventory, usedItemsInSession, phoenixFeatherUsed, isGoldenAppleActive, removedOptions, room?.id, userData?.uid, quiz, submitted, questions]);
 
   const handleAnswer = async (optionIndex: number) => {
     if (isAnswering || feedback || answers[currentQuestionIdx] !== undefined) return;
@@ -169,6 +317,7 @@ export default function SiswaRoom() {
       }
     };
 
+    let wasPhoenixUsed = false;
     if (isCorrect) {
       setFeedback("correct");
       setStreak(prev => prev + 1);
@@ -183,6 +332,7 @@ export default function SiswaRoom() {
     } else {
       // Check for Phoenix Feather
       if (phoenixFeatherUsed < 5 && inventory["phoenix_feather"] > 0) {
+        wasPhoenixUsed = true;
         setFeedback("correct"); // Treat as correct
         setAnswers(prev => ({ ...prev, [currentQuestionIdx]: currentQ.correctAnswerIndex })); // Fix answer state
         setStreak(prev => prev + 1);
@@ -212,9 +362,27 @@ export default function SiswaRoom() {
 
       // Update progress in leaderboard
       if (userData?.uid && room?.id) {
-        const answeredCount = Object.keys({ ...answers, [currentQuestionIdx]: optionIndex }).length;
+        let finalOptionIndex = optionIndex;
+        if (wasPhoenixUsed) {
+          finalOptionIndex = currentQ.correctAnswerIndex;
+        }
+        
+        const newAnswers = { ...answers, [currentQuestionIdx]: finalOptionIndex };
+        const answeredCount = Object.keys(newAnswers).length;
+        
+        let currentCorrectCount = 0;
+        questions.forEach((q, idx) => {
+          if (newAnswers[idx] === q.correctAnswerIndex) {
+            currentCorrectCount++;
+          }
+        });
+        
+        let currentScore = currentCorrectCount * 10;
+        if (isGoldenAppleActive) currentScore *= 2;
+
         await setDoc(doc(db, "rooms", room.id, "leaderboard", userData.uid), {
           progress: answeredCount,
+          score: currentScore,
           lastUpdate: new Date()
         }, { merge: true });
       }
@@ -290,6 +458,61 @@ export default function SiswaRoom() {
     });
   };
 
+  const handleResume = () => {
+    if (incompleteSession) {
+      setQuestions(incompleteSession.questions);
+      setAnswers(incompleteSession.answers || {});
+      setCurrentQuestionIdx(incompleteSession.currentQuestionIdx || 0);
+      setScore(incompleteSession.score || 0);
+      setStreak(incompleteSession.streak || 0);
+      setRevealedIndices(incompleteSession.revealedIndices || []);
+      if (incompleteSession.inventory) setInventory(incompleteSession.inventory);
+      setUsedItemsInSession(incompleteSession.usedItemsInSession || []);
+      setPhoenixFeatherUsed(incompleteSession.phoenixFeatherUsed || 0);
+      setIsGoldenAppleActive(incompleteSession.isGoldenAppleActive || false);
+      setRemovedOptions(incompleteSession.removedOptions || []);
+    }
+    setShowResumePrompt(false);
+  };
+
+  const handleRestart = async () => {
+    if (!quiz || !room?.id || !userData?.uid) return;
+    const shuffled = shuffleArray(quiz.questions.map((q: any, idx: number) => ({ ...q, originalIndex: idx })));
+    setQuestions(shuffled);
+    setAnswers({});
+    setCurrentQuestionIdx(0);
+    setScore(0);
+    setStreak(0);
+    setRevealedIndices([]);
+    setUsedItemsInSession([]);
+    setPhoenixFeatherUsed(0);
+    setIsGoldenAppleActive(false);
+    setRemovedOptions([]);
+    if (userData?.inventory) setInventory(userData.inventory);
+    
+    await setDoc(doc(db, "rooms", room.id, "leaderboard", userData.uid), {
+      progress: 0,
+      score: 0,
+      status: "playing",
+      lastUpdate: new Date(),
+      sessionData: {
+        questions: shuffled,
+        answers: {},
+        currentQuestionIdx: 0,
+        score: 0,
+        streak: 0,
+        revealedIndices: [],
+        inventory: userData?.inventory || {},
+        usedItemsInSession: [],
+        phoenixFeatherUsed: 0,
+        isGoldenAppleActive: false,
+        removedOptions: []
+      }
+    }, { merge: true });
+    
+    setShowResumePrompt(false);
+  };
+
   const handleUseItem = (itemId: string) => {
     if (isAnswering || feedback || inventory[itemId] <= 0) return;
 
@@ -313,8 +536,68 @@ export default function SiswaRoom() {
     }
   };
 
+  if (classError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-brand-cream text-brand-navy p-4">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white border border-brand-navy/5 p-8 md:p-12 rounded-[48px] shadow-2xl shadow-brand-navy/5 max-w-md w-full text-center"
+        >
+          <div className="w-20 h-20 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-8">
+            <X className="w-10 h-10" />
+          </div>
+          <h2 className="text-2xl font-black mb-4 text-brand-navy">Akses Dibatasi</h2>
+          <p className="text-brand-navy/60 mb-8 leading-relaxed">
+            {classError}
+          </p>
+          <button 
+            onClick={() => router.push("/siswa")}
+            className="w-full bg-brand-navy text-white font-bold py-4 rounded-2xl hover:bg-brand-black transition-all"
+          >
+            Kembali ke Beranda
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
   if (!room) return <div className="p-8 text-center text-brand-navy/60 bg-brand-cream min-h-screen flex items-center justify-center">Mencari ruangan...</div>;
   
+  if (showResumePrompt) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-brand-cream text-brand-navy p-4">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white border border-brand-navy/5 p-8 md:p-12 rounded-[48px] shadow-2xl shadow-brand-navy/5 max-w-md w-full text-center relative overflow-hidden"
+        >
+          <div className="w-20 h-20 bg-brand-orange/10 text-brand-orange rounded-3xl flex items-center justify-center mx-auto mb-8">
+            <Gamepad2 className="w-10 h-10" />
+          </div>
+          <h2 className="text-2xl font-black mb-4 text-brand-navy">Sesi Belum Selesai</h2>
+          <p className="text-brand-navy/60 mb-8 leading-relaxed">
+            Sistem mendeteksi bahwa kamu belum menyelesaikan kuis ini (mungkin karena kendala koneksi). Apakah kamu ingin melanjutkan dari soal terakhir atau mengulang dari awal?
+          </p>
+          <div className="flex flex-col gap-4">
+            <button 
+              onClick={handleResume}
+              className="w-full bg-brand-orange text-white font-bold py-4 rounded-2xl hover:bg-brand-orange/90 transition-all shadow-lg shadow-brand-orange/20"
+            >
+              Lanjutkan Kuis
+            </button>
+            <button 
+              onClick={handleRestart}
+              className="w-full bg-brand-cream text-brand-navy font-bold py-4 rounded-2xl hover:bg-brand-navy/5 transition-all"
+            >
+              Mulai dari Awal
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   if (room.status === "waiting") {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-brand-cream text-brand-navy p-4">
@@ -551,9 +834,9 @@ export default function SiswaRoom() {
 
                           return (
                             <div key={oIdx} className={`p-3 rounded-xl text-sm font-medium border flex items-center justify-between ${borderClass} ${bgClass} ${textClass}`}>
-                              <div className="flex items-center">
-                                <span className="font-black mr-2 opacity-40">{String.fromCharCode(65 + oIdx)}.</span>
-                                {opt}
+                              <div className="flex items-center flex-1 break-words pr-2">
+                                <span className="font-black mr-2 opacity-40 flex-shrink-0">{String.fromCharCode(65 + oIdx)}.</span>
+                                <span>{opt}</span>
                               </div>
                               {isCorrectChoice && <span className="text-[8px] font-black uppercase tracking-widest bg-emerald-500 text-white px-1.5 py-0.5 rounded">Benar</span>}
                               {isStudentChoice && !isCorrectChoice && <span className="text-[8px] font-black uppercase tracking-widest bg-red-500 text-white px-1.5 py-0.5 rounded">Pilihanmu</span>}
@@ -598,7 +881,7 @@ export default function SiswaRoom() {
   ];
 
   return (
-    <div className="min-h-screen bg-brand-cream flex flex-col items-center overflow-hidden">
+    <div className="min-h-screen bg-brand-cream flex flex-col items-center overflow-hidden select-none">
       <div className="w-full max-w-md md:max-w-2xl px-4 py-6 md:py-10">
         {/* Item Bar */}
         <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">
@@ -729,7 +1012,7 @@ export default function SiswaRoom() {
                     </svg>
                     
                     {/* The Box */}
-                    <div className={`w-full p-2 font-mono text-[10px] md:text-xs font-black uppercase leading-tight ${btnClass}`} style={{ boxShadow: '4px 4px 0px rgba(0,0,0,0.5)' }}>
+                    <div className={`w-full p-2 font-mono text-[10px] md:text-xs font-black uppercase leading-tight break-words ${btnClass}`} style={{ boxShadow: '4px 4px 0px rgba(0,0,0,0.5)' }}>
                       {opt}
                     </div>
                   </motion.button>
@@ -794,7 +1077,7 @@ export default function SiswaRoom() {
                       }`}>
                         {isRemoved ? <Ghost className="w-4 h-4 opacity-20" /> : String.fromCharCode(65 + idx)}
                       </span>
-                      <span className="line-clamp-2">{isRemoved ? "???" : opt}</span>
+                      <span className="break-words w-full">{isRemoved ? "???" : opt}</span>
                     </div>
                   </button>
                 );
@@ -862,11 +1145,14 @@ export default function SiswaRoom() {
               className="relative w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden text-center p-10 border-4 border-red-500"
             >
               <div className="w-24 h-24 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Zap className="w-12 h-12" />
+                <Zap className="w-12 h-12 animate-pulse" />
               </div>
-              <h2 className="text-3xl font-black text-brand-navy tracking-tight italic font-serif mb-4">Dilarang Mencontek!</h2>
-              <p className="text-brand-navy/60 font-medium mb-8">
-                Sistem mendeteksi Anda meninggalkan halaman kuis. Harap kerjakan kuis dengan jujur dan jangan membuka tab atau aplikasi lain.
+              <h2 className="text-3xl font-black text-brand-navy tracking-tight italic font-serif mb-4">Peringatan Kecurangan!</h2>
+              <p className="text-brand-navy/60 font-medium mb-4">
+                {cheatMessage}
+              </p>
+              <p className="text-red-500 font-bold mb-8">
+                Pelanggaran ke-{cheatCount}
               </p>
               <button 
                 onClick={() => setIsCheating(false)}
@@ -874,6 +1160,34 @@ export default function SiswaRoom() {
               >
                 Saya Mengerti
               </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {isOffline && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="absolute inset-0 bg-brand-navy/90 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              className="relative w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden text-center p-10 border-4 border-orange-500"
+            >
+              <div className="w-24 h-24 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <WifiOff className="w-12 h-12 animate-pulse" />
+              </div>
+              <h2 className="text-3xl font-black text-brand-navy tracking-tight italic font-serif mb-4">Koneksi Terputus!</h2>
+              <p className="text-brand-navy/60 font-medium mb-8">
+                Koneksi internet Anda terputus. Harap periksa jaringan Anda. Kuis akan dilanjutkan otomatis setelah koneksi kembali.
+              </p>
+              <div className="flex justify-center items-center gap-2 text-orange-500 font-bold">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Menunggu jaringan...
+              </div>
             </motion.div>
           </div>
         )}

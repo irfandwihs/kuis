@@ -177,7 +177,7 @@ export default function GuruRoom() {
                         <div>
                           <h3 className="font-black text-brand-navy text-base leading-none mb-1">{entry.siswaName}</h3>
                           <p className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest">
-                            {entry.studentClass} • No Absen {entry.studentAbsen || "-"} • {entry.status === "finished" ? "Selesai" : "Sedang Mengerjakan"}
+                            {entry.studentClass} • No Absen {entry.studentAbsen || "-"} • {entry.status === "finished" ? "Selesai" : `Sedang Mengerjakan Soal ke-${Math.min((entry.progress || 0) + 1, entry.totalQuestions || 1)}`}
                           </p>
                         </div>
                       </div>

@@ -98,6 +98,27 @@ export default function GuruDashboard() {
     "multiple_choice" | "true_false" | "duck_hunt" | "hidden_word" | "mixed_1" | "mixed_2"
   >("multiple_choice");
   const [viewingQuiz, setViewingQuiz] = useState<Quiz | null>(null);
+  const [selectedClass, setSelectedClass] = useState<string>("Semua Kelas");
+  const [availableClasses, setAvailableClasses] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        const q = query(collection(db, "users"), where("role", "==", "Siswa"));
+        const snapshot = await getDocs(q);
+        const classes = new Set<string>();
+        snapshot.docs.forEach((doc) => {
+          const cls = doc.data().studentClass;
+          if (cls) classes.add(cls);
+        });
+        setAvailableClasses(Array.from(classes).sort());
+      } catch (error) {
+        console.error("Error fetching classes:", error);
+      }
+    };
+    fetchClasses();
+  }, []);
+
   const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
   const [deletingQuizId, setDeletingQuizId] = useState<string | null>(null);
   const [topStudents, setTopStudents] = useState<any[]>([]);
@@ -331,8 +352,7 @@ export default function GuruDashboard() {
         q = query(
           collection(db, "users"),
           where("role", "==", "Siswa"),
-          orderBy("xp", "desc"),
-          limit(50),
+          orderBy("xp", "desc")
         );
       }
       const snapshot = await getDocs(q);
@@ -548,6 +568,7 @@ export default function GuruDashboard() {
       quizId,
       guruId: userData?.uid,
       status: "waiting",
+      targetClass: selectedClass,
       createdAt: new Date(),
     });
     router.push(`/room/guru/${roomCode}`);
@@ -1828,7 +1849,7 @@ export default function GuruDashboard() {
                     {q.options.map((opt: string, oIdx: number) => (
                       <div
                         key={oIdx}
-                        className={`p-3 rounded-xl text-sm font-medium border ${
+                        className={`p-3 rounded-xl text-sm font-medium border break-words ${
                           oIdx === q.correctAnswerIndex
                             ? "bg-emerald-50 border-emerald-200 text-emerald-700"
                             : "bg-white border-brand-navy/5 text-brand-navy/60"
@@ -1850,7 +1871,24 @@ export default function GuruDashboard() {
               ))}
             </div>
 
-            <div className="p-6 md:p-8 border-t border-brand-navy/5 bg-white">
+            <div className="p-6 md:p-8 border-t border-brand-navy/5 bg-white space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
+                  Target Kelas
+                </label>
+                <select
+                  value={selectedClass}
+                  onChange={(e) => setSelectedClass(e.target.value)}
+                  className="w-full p-4 bg-brand-cream/50 border border-brand-navy/5 rounded-2xl font-bold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-orange/20"
+                >
+                  <option value="Semua Kelas">Semua Kelas</option>
+                  {availableClasses.map((cls) => (
+                    <option key={cls} value={cls}>
+                      Kelas {cls}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <button
                 onClick={() => {
                   createRoom(viewingQuiz.id);
