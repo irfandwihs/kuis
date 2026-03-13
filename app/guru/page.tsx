@@ -69,6 +69,7 @@ interface Room {
   quizId: string;
   status: string;
   quizTitle?: string;
+  targetClass?: string;
   createdAt: any;
 }
 

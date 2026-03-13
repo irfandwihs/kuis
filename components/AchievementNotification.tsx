@@ -42,8 +42,8 @@ export default function AchievementNotification() {
       return;
     }
 
-    const prevXp = prevXpRef.current;
-    const prevDiamonds = prevDiamondsRef.current;
+    const prevXp = prevXpRef.current ?? 0;
+    const prevDiamonds = prevDiamondsRef.current ?? 0;
 
     const prevLevel = Math.floor(prevXp / 100) + 1;
     const currentLevel = Math.floor(currentXp / 100) + 1;

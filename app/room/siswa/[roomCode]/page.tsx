@@ -113,7 +113,7 @@ export default function SiswaRoom() {
       if (cheatCount + 1 >= 5) {
         setCheatMessage("Anda telah melebihi batas toleransi kecurangan (5 kali). Kuis akan dikumpulkan secara otomatis.");
         setTimeout(() => {
-          handleSubmit();
+          submitQuiz();
         }, 3000);
       }
 

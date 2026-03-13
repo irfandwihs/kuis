@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
-import { doc, getDoc, setDoc, updateDoc, increment, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, increment, onSnapshot, collection, query, where, limit, getDocs } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { useRouter, usePathname } from "next/navigation";
 
