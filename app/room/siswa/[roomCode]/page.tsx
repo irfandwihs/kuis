@@ -14,6 +14,7 @@ import {
   increment,
   addDoc,
   getCountFromServer,
+  arrayUnion,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -73,6 +74,7 @@ export default function SiswaRoom() {
   const [isCheating, setIsCheating] = useState(false);
   const [cheatMessage, setCheatMessage] = useState("");
   const [cheatCount, setCheatCount] = useState(0);
+  const [lockoutTimer, setLockoutTimer] = useState(0);
   const [isOffline, setIsOffline] = useState(false);
   const [classError, setClassError] = useState<string | null>(null);
 
@@ -100,10 +102,37 @@ export default function SiswaRoom() {
   useEffect(() => {
     if (!room || room.status !== "playing" || submitted) return;
 
-    const triggerCheatAlarm = (message: string) => {
+    const triggerCheatAlarm = async (message: string) => {
+      if (isCheating) return; // Don't trigger if already showing
+
       setIsCheating(true);
       setCheatMessage(message);
       setCheatCount((prev) => prev + 1);
+      setLockoutTimer(10); // 10 seconds lockout
+
+      if (cheatCount + 1 >= 5) {
+        setCheatMessage("Anda telah melebihi batas toleransi kecurangan (5 kali). Kuis akan dikumpulkan secara otomatis.");
+        setTimeout(() => {
+          handleSubmit();
+        }, 3000);
+      }
+
+      if (room?.id && userData?.uid) {
+        try {
+          await setDoc(
+            doc(db, "rooms", room.id, "leaderboard", userData.uid),
+            {
+              cheated: true,
+              cheatCount: increment(1),
+              lastCheatMessage: message,
+              activityLog: arrayUnion({ type: "cheated", message, timestamp: new Date() })
+            },
+            { merge: true }
+          );
+        } catch (e) {
+          console.error("Failed to log cheat", e);
+        }
+      }
 
       // Vibrate
       if (navigator.vibrate) {
@@ -188,8 +217,35 @@ export default function SiswaRoom() {
       }
     };
 
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
+    const handleOnline = async () => {
+      setIsOffline(false);
+      if (room?.id && userData?.uid) {
+        try {
+          await setDoc(
+            doc(db, "rooms", room.id, "leaderboard", userData.uid),
+            { activityLog: arrayUnion({ type: "online", timestamp: new Date() }) },
+            { merge: true }
+          );
+        } catch (e) {
+          console.error("Failed to log online status", e);
+        }
+      }
+    };
+    
+    const handleOffline = async () => {
+      setIsOffline(true);
+      if (room?.id && userData?.uid) {
+        try {
+          await setDoc(
+            doc(db, "rooms", room.id, "leaderboard", userData.uid),
+            { activityLog: arrayUnion({ type: "offline", timestamp: new Date() }) },
+            { merge: true }
+          );
+        } catch (e) {
+          console.error("Failed to log offline status", e);
+        }
+      }
+    };
 
     // Initial check
     setIsOffline(!navigator.onLine);
@@ -213,7 +269,15 @@ export default function SiswaRoom() {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, [room, submitted]);
+  }, [room, submitted, isCheating, cheatCount, userData?.uid]);
+
+  // Lockout timer effect
+  useEffect(() => {
+    if (lockoutTimer > 0) {
+      const timer = setTimeout(() => setLockoutTimer(lockoutTimer - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [lockoutTimer]);
 
   useEffect(() => {
     if (!roomCode) return;
@@ -302,6 +366,8 @@ export default function SiswaRoom() {
                     totalQuestions: shuffled.length,
                     status: "playing",
                     lastUpdate: new Date(),
+                    attempts: 1,
+                    activityLog: arrayUnion({ type: "started", timestamp: new Date() }),
                     sessionData: {
                       questions: shuffled,
                       answers: {},
@@ -551,6 +617,7 @@ export default function SiswaRoom() {
         score: calculatedScore,
         status: "finished",
         submittedAt: new Date(),
+        activityLog: arrayUnion({ type: "finished", timestamp: new Date() })
       },
       { merge: true },
     );
@@ -582,10 +649,12 @@ export default function SiswaRoom() {
       score: calculatedScore,
       roomCode: room.roomCode,
       completedAt: new Date(),
+      questions: questions,
+      answers: answers,
     });
   };
 
-  const handleResume = () => {
+  const handleResume = async () => {
     if (incompleteSession) {
       setQuestions(incompleteSession.questions);
       setAnswers(incompleteSession.answers || {});
@@ -601,6 +670,21 @@ export default function SiswaRoom() {
       setRemovedOptions(incompleteSession.removedOptions || []);
     }
     setShowResumePrompt(false);
+
+    if (room?.id && userData?.uid) {
+      try {
+        await setDoc(
+          doc(db, "rooms", room.id, "leaderboard", userData.uid),
+          { 
+            activityLog: arrayUnion({ type: "resumed", timestamp: new Date() }),
+            attempts: increment(1)
+          },
+          { merge: true }
+        );
+      } catch (e) {
+        console.error("Failed to log resume", e);
+      }
+    }
   };
 
   const handleRestart = async () => {
@@ -630,6 +714,8 @@ export default function SiswaRoom() {
         score: 0,
         status: "playing",
         lastUpdate: new Date(),
+        attempts: increment(1),
+        activityLog: arrayUnion({ type: "restarted", timestamp: new Date() }),
         sessionData: {
           questions: shuffled,
           answers: {},
@@ -1501,10 +1587,19 @@ export default function SiswaRoom() {
                 Pelanggaran ke-{cheatCount}
               </p>
               <button
-                onClick={() => setIsCheating(false)}
-                className="w-full bg-red-500 text-white font-black py-5 rounded-3xl hover:bg-red-600 transition-all active:scale-95 uppercase tracking-widest text-sm"
+                onClick={() => {
+                  if (lockoutTimer === 0) {
+                    setIsCheating(false);
+                  }
+                }}
+                disabled={lockoutTimer > 0}
+                className={`w-full font-black py-5 rounded-3xl transition-all active:scale-95 uppercase tracking-widest text-sm ${
+                  lockoutTimer > 0 
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed" 
+                    : "bg-red-500 text-white hover:bg-red-600"
+                }`}
               >
-                Saya Mengerti
+                {lockoutTimer > 0 ? `Tunggu ${lockoutTimer} detik...` : "Saya Mengerti"}
               </button>
             </motion.div>
           </div>

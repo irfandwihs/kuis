@@ -34,6 +34,7 @@ export default function StudentOnboardingModal() {
         studentClass: studentClass,
         studentAbsen: studentAbsen
       });
+      // After update, AuthContext will have updated userData.role
     } catch (error) {
       console.error("Error updating profile:", error);
     } finally {

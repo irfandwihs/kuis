@@ -1,16 +1,7 @@
 "use client";
 
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  FlaskConical,
-  GraduationCap,
-  Pencil,
-  Star,
-  Cloud,
-  Bell,
-  HelpCircle,
-  Lightbulb,
-} from "lucide-react";
+import { FlaskConical, GraduationCap, Pencil, Star, Cloud, Bell, HelpCircle, Lightbulb } from "lucide-react";
 import { motion } from "motion/react";
 import Image from "next/image";
 
@@ -20,14 +11,12 @@ export default function Home() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-brand-navy text-white">
-        <motion.div
+        <motion.div 
           animate={{ rotate: 360 }}
           transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
           className="w-12 h-12 border-4 border-brand-orange border-t-transparent rounded-full mb-4"
         />
-        <p className="text-white/60 font-bold tracking-widest uppercase text-xs animate-pulse">
-          Memuat Petualangan...
-        </p>
+        <p className="text-white/60 font-bold tracking-widest uppercase text-xs animate-pulse">Memuat Petualangan...</p>
       </div>
     );
   }
@@ -36,8 +25,8 @@ export default function Home() {
     <div className="min-h-screen bg-brand-navy flex flex-col items-center justify-center overflow-hidden relative">
       {/* Background Image from Attachment */}
       <div className="absolute inset-0 z-0">
-        <Image
-          src="/home-bg.webp"
+        <Image 
+          src="/home-bg.png" 
           alt="Background"
           fill
           className="object-cover opacity-60"
@@ -59,9 +48,7 @@ export default function Home() {
               <Pencil className="w-12 h-12 md:w-16 md:h-16 text-brand-orange fill-brand-orange/20 drop-shadow-lg" />
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-6 h-4 bg-brand-orange rounded-sm opacity-60 blur-[2px]" />
             </div>
-            <span className="text-6xl md:text-7xl font-black tracking-tight text-brand-orange drop-shadow-2xl">
-              PLAY
-            </span>
+            <span className="text-6xl md:text-7xl font-black tracking-tight text-brand-orange drop-shadow-2xl">PLAY</span>
           </div>
         </div>
 
@@ -81,12 +68,8 @@ export default function Home() {
 
       <style jsx global>{`
         @keyframes spin-slow {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
         .animate-spin-slow {
           animation: spin-slow 20s linear infinite;

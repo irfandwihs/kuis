@@ -23,6 +23,9 @@ import {
   User,
   CheckCircle,
   Sparkles,
+  ChevronRight,
+  Medal,
+  Target,
 } from "lucide-react";
 import {
   collection,
@@ -38,7 +41,7 @@ import {
 import { db } from "@/lib/firebase";
 import StudentOnboardingModal from "@/components/StudentOnboardingModal";
 import Avatar from "@/components/Avatar";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import Shop from "@/components/Shop";
 
 interface Material {
@@ -55,6 +58,18 @@ interface Material {
   createdAt: any;
 }
 
+interface Assignment {
+  id: string;
+  guruId: string;
+  subject: string;
+  title: string;
+  description: string;
+  content: string;
+  deadline?: any;
+  targetClass: string;
+  createdAt: any;
+}
+
 export default function SiswaDashboard() {
   const { userData, logout, updateProfile } = useAuth();
   const router = useRouter();
@@ -64,6 +79,44 @@ export default function SiswaDashboard() {
   const [globalLeaderboard, setGlobalLeaderboard] = useState<any[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [viewingMaterial, setViewingMaterial] = useState<Material | null>(null);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [viewingAssignment, setViewingAssignment] = useState<Assignment | null>(null);
+  const [viewingHistory, setViewingHistory] = useState<any>(null);
+
+  const ACHIEVEMENTS = [
+    {
+      id: "first_quiz",
+      title: "Petualang Pertama",
+      description: "Selesaikan kuis pertama kamu",
+      icon: <Zap className="w-5 h-5" />,
+      condition: (user: any) => (user.quizzesPlayed || 0) >= 1,
+      color: "bg-amber-100 text-amber-600",
+    },
+    {
+      id: "xp_collector",
+      title: "Pengumpul XP",
+      description: "Capai total 500 XP",
+      icon: <Target className="w-5 h-5" />,
+      condition: (user: any) => (user.xp || 0) >= 500,
+      color: "bg-blue-100 text-blue-600",
+    },
+    {
+      id: "diamond_hoarder",
+      title: "Kolektor Diamond",
+      description: "Miliki 100 Diamond",
+      icon: <Star className="w-5 h-5" />,
+      condition: (user: any) => (user.diamonds || 0) >= 100,
+      color: "bg-sky-100 text-sky-600",
+    },
+    {
+      id: "quiz_master",
+      title: "Master Kuis",
+      description: "Selesaikan 10 kuis",
+      icon: <Medal className="w-5 h-5" />,
+      condition: (user: any) => (user.quizzesPlayed || 0) >= 10,
+      color: "bg-purple-100 text-purple-600",
+    },
+  ];
   const [mainTab, setMainTab] = useState<
     "beranda" | "kuis" | "tugas" | "materi" | "profil"
   >("beranda");
@@ -136,6 +189,20 @@ export default function SiswaDashboard() {
           (doc) => ({ id: doc.id, ...doc.data() }) as Material,
         );
         setMaterials(materialsData);
+
+        // 5. Fetch Assignments
+        if (userData.studentClass) {
+          const qAssignments = query(
+            collection(db, "assignments"),
+            where("targetClass", "in", ["Semua Kelas", userData.studentClass]),
+            orderBy("createdAt", "desc")
+          );
+          const snapshotAssignments = await getDocs(qAssignments);
+          const assignmentsData = snapshotAssignments.docs.map(
+            (doc) => ({ id: doc.id, ...doc.data() }) as Assignment,
+          );
+          setAssignments(assignmentsData);
+        }
       } catch (error) {
         console.error("Error fetching data:", error);
       }
@@ -173,6 +240,11 @@ export default function SiswaDashboard() {
             <div>
               <h1 className="text-xl font-black text-brand-navy tracking-tight">
                 {userData.displayName}
+                {userData.role === "Umum" && (
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-slate-100 text-slate-500 uppercase tracking-widest border border-slate-200">
+                    Umum
+                  </span>
+                )}
               </h1>
               <p className="text-brand-navy/60 text-xs font-bold uppercase tracking-wider">
                 Level {level} • {userData.studentClass || "Siswa"}{" "}
@@ -293,34 +365,43 @@ export default function SiswaDashboard() {
                   ) : (
                     <div className="space-y-4">
                       {quizHistory.map((item) => (
-                        <div
+                        <button
                           key={item.id}
-                          className="p-4 bg-brand-cream/50 rounded-2xl border border-transparent hover:border-brand-orange/20 transition-all flex justify-between items-center"
+                          onClick={() => setViewingHistory(item)}
+                          className="w-full p-4 bg-brand-cream/50 rounded-2xl border border-transparent hover:border-brand-orange/20 hover:bg-white transition-all flex justify-between items-center group text-left"
                         >
-                          <div>
-                            <h3 className="font-black text-brand-navy text-sm mb-1">
-                              {item.quizTitle}
-                            </h3>
-                            <p className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest">
-                              {item.completedAt
-                                ?.toDate()
-                                .toLocaleDateString("id-ID", {
-                                  day: "numeric",
-                                  month: "short",
-                                  year: "numeric",
-                                })}{" "}
-                              • Room: {item.roomCode}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-lg font-black text-brand-orange">
-                              +{item.score}
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-brand-orange shadow-sm group-hover:scale-110 transition-transform">
+                              <History className="w-5 h-5" />
                             </div>
-                            <div className="text-[8px] text-brand-navy/40 font-black uppercase tracking-widest">
-                              XP
+                            <div>
+                              <h3 className="font-black text-brand-navy text-sm mb-1">
+                                {item.quizTitle}
+                              </h3>
+                              <p className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest">
+                                {item.completedAt
+                                  ?.toDate()
+                                  .toLocaleDateString("id-ID", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                  })}{" "}
+                                • Room: {item.roomCode}
+                              </p>
                             </div>
                           </div>
-                        </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <div className="text-lg font-black text-brand-orange">
+                                +{item.score}
+                              </div>
+                              <div className="text-[8px] text-brand-navy/40 font-black uppercase tracking-widest">
+                                XP
+                              </div>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-brand-navy/20 group-hover:text-brand-orange transition-colors" />
+                          </div>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -535,16 +616,51 @@ export default function SiswaDashboard() {
         )}
 
         {mainTab === "tugas" && (
-          <div className="flex flex-col items-center justify-center py-12 text-center animate-in fade-in zoom-in-95 duration-300">
-            <div className="w-20 h-20 bg-brand-cream/50 text-brand-navy/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
-              <FileText className="w-10 h-10" />
-            </div>
-            <h2 className="text-2xl font-black text-brand-navy mb-2 tracking-tight">
-              Tugas
-            </h2>
-            <p className="text-brand-navy/60 text-sm font-medium">
-              Belum ada tugas yang diberikan.
-            </p>
+          <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+            <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5">
+              <div className="flex items-center justify-between mb-6 md:mb-8">
+                <h2 className="text-xl md:text-2xl font-black text-brand-navy flex items-center gap-3 tracking-tight">
+                  <FileText className="w-6 h-6 md:w-7 md:h-7 text-brand-orange" />
+                  Tugas Saya
+                </h2>
+              </div>
+
+              {assignments.length === 0 ? (
+                <div className="text-center py-12 md:py-16 bg-brand-cream/30 rounded-[32px] border-2 border-dashed border-brand-navy/10">
+                  <FileText className="w-10 h-10 md:w-12 md:h-12 text-brand-navy/20 mx-auto mb-4" />
+                  <p className="text-brand-navy/40 text-sm font-bold">
+                    Belum ada tugas untuk kelas kamu.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {assignments.map((asg) => (
+                    <button
+                      key={asg.id}
+                      onClick={() => setViewingAssignment(asg)}
+                      className="w-full p-6 bg-white border-2 border-brand-navy/5 rounded-3xl hover:border-brand-orange hover:shadow-xl hover:shadow-brand-orange/5 transition-all text-left group"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="px-2 py-1 bg-brand-orange/10 text-brand-orange text-[10px] font-black uppercase tracking-widest rounded-md">
+                          {asg.subject}
+                        </span>
+                        {asg.deadline && (
+                          <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest">
+                            Deadline: {asg.deadline.toDate().toLocaleDateString("id-ID")}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-black text-brand-navy text-lg mb-1 group-hover:text-brand-orange transition-colors">
+                        {asg.title}
+                      </h3>
+                      <p className="text-xs text-brand-navy/40 font-medium line-clamp-2">
+                        {asg.description}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
         )}
 
@@ -685,6 +801,60 @@ export default function SiswaDashboard() {
                           {userData.studentAbsen || "-"}
                         </span>
                       </div>
+                      <div className="flex justify-between text-xs font-bold pt-2 border-t border-brand-navy/5">
+                        <span className="text-brand-navy/40">Status</span>
+                        <span className={userData.role === "Umum" ? "text-slate-500" : "text-brand-navy"}>
+                          {userData.role === "Umum" ? "Pengguna Umum" : "Siswa Terverifikasi"}
+                        </span>
+                      </div>
+                      {userData.role === "Umum" && (
+                        <p className="text-[9px] text-slate-400 italic leading-tight mt-1">
+                          *Akun ini menjadi &apos;Umum&apos; karena No Absen &amp; Kelas sudah digunakan oleh email lain.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-brand-cream/30 rounded-2xl border border-brand-navy/5">
+                    <div className="flex justify-between items-center mb-4">
+                      <span className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest">
+                        Pencapaian
+                      </span>
+                      <span className="text-[10px] font-black text-brand-orange uppercase tracking-widest">
+                        {ACHIEVEMENTS.filter(a => a.condition(userData)).length}/{ACHIEVEMENTS.length}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3">
+                      {ACHIEVEMENTS.map((achievement) => {
+                        const isUnlocked = achievement.condition(userData);
+                        return (
+                          <div
+                            key={achievement.id}
+                            className={`p-3 rounded-2xl border flex items-center gap-3 transition-all ${
+                              isUnlocked
+                                ? "bg-white border-brand-navy/5 shadow-sm"
+                                : "bg-brand-cream/20 border-transparent opacity-50 grayscale"
+                            }`}
+                          >
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isUnlocked ? achievement.color : "bg-slate-100 text-slate-400"}`}>
+                              {achievement.icon}
+                            </div>
+                            <div>
+                              <h4 className="text-xs font-black text-brand-navy">
+                                {achievement.title}
+                              </h4>
+                              <p className="text-[9px] text-brand-navy/60 font-medium">
+                                {achievement.description}
+                              </p>
+                            </div>
+                            {isUnlocked && (
+                              <div className="ml-auto">
+                                <CheckCircle className="w-4 h-4 text-emerald-500" />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -821,6 +991,173 @@ export default function SiswaDashboard() {
         )}
       </div>
 
+      {/* View Assignment Modal */}
+      <AnimatePresence>
+        {viewingAssignment && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-navy/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white rounded-[40px] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+            >
+              <div className="p-6 md:p-8 border-b border-brand-navy/5 flex justify-between items-center bg-white sticky top-0 z-10">
+                <div>
+                  <div className="flex gap-2 mb-2">
+                    <span className="px-2 py-1 bg-brand-orange/10 text-brand-orange text-[10px] font-black uppercase tracking-widest rounded-md">
+                      {viewingAssignment.subject}
+                    </span>
+                    {viewingAssignment.deadline && (
+                      <span className="px-2 py-1 bg-red-50 text-red-500 text-[10px] font-black uppercase tracking-widest rounded-md">
+                        Deadline: {viewingAssignment.deadline.toDate().toLocaleDateString("id-ID")}
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="text-xl md:text-2xl font-black text-brand-navy tracking-tight">
+                    {viewingAssignment.title}
+                  </h2>
+                </div>
+                <button
+                  onClick={() => setViewingAssignment(null)}
+                  className="w-10 h-10 rounded-full bg-brand-cream flex items-center justify-center text-brand-navy/40 hover:text-brand-navy transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 md:p-8">
+                <div 
+                  className="prose prose-sm md:prose-base max-w-none text-brand-navy/80"
+                  dangerouslySetInnerHTML={{ __html: viewingAssignment.content }}
+                />
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Quiz Review Modal */}
+      <AnimatePresence>
+        {viewingHistory && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-navy/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white rounded-[40px] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+            >
+              <div className="p-6 md:p-8 border-b border-brand-navy/5 flex justify-between items-center bg-white sticky top-0 z-10">
+                <div>
+                  <h2 className="text-xl md:text-2xl font-black text-brand-navy tracking-tight">
+                    Tinjauan Kuis
+                  </h2>
+                  <p className="text-xs text-brand-navy/40 font-black uppercase tracking-widest mt-1">
+                    {viewingHistory.quizTitle}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setViewingHistory(null)}
+                  className="w-10 h-10 rounded-full bg-brand-cream flex items-center justify-center text-brand-navy/40 hover:text-brand-navy transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+                {!viewingHistory.questions ? (
+                  <div className="text-center py-12">
+                    <History className="w-12 h-12 text-brand-navy/10 mx-auto mb-4" />
+                    <p className="text-brand-navy/40 font-bold">
+                      Maaf, data pertanyaan untuk kuis ini tidak tersedia.
+                    </p>
+                    <p className="text-[10px] text-brand-navy/20 uppercase tracking-widest mt-2">
+                      Hanya kuis yang diselesaikan setelah pembaruan ini yang dapat ditinjau.
+                    </p>
+                  </div>
+                ) : (
+                  viewingHistory.questions.map((q: any, idx: number) => {
+                    const studentAnswer = viewingHistory.answers?.[String(idx)];
+                    const isCorrect = studentAnswer === q.correctAnswerIndex;
+
+                    return (
+                      <div
+                        key={idx}
+                        className="p-6 bg-brand-cream/30 rounded-3xl border border-brand-navy/5 space-y-4"
+                      >
+                        <div className="flex gap-4">
+                          <span
+                            className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 ${isCorrect ? "bg-emerald-500 text-white" : "bg-red-500 text-white"}`}
+                          >
+                            {idx + 1}
+                          </span>
+                          <h3 className="font-bold text-brand-navy text-lg leading-tight">
+                            {q.question}
+                          </h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-2 pl-12">
+                          {q.options.map((opt: string, oIdx: number) => {
+                            const isStudentChoice = studentAnswer === oIdx;
+                            const isCorrectChoice = oIdx === q.correctAnswerIndex;
+
+                            let borderClass = "border-brand-navy/5";
+                            let bgClass = "bg-white";
+                            let textClass = "text-brand-navy/60";
+
+                            if (isCorrectChoice) {
+                              borderClass = "border-emerald-500";
+                              bgClass = "bg-emerald-50";
+                              textClass = "text-emerald-700";
+                            } else if (isStudentChoice && !isCorrectChoice) {
+                              borderClass = "border-red-500";
+                              bgClass = "bg-red-50";
+                              textClass = "text-red-700";
+                            }
+
+                            return (
+                              <div
+                                key={oIdx}
+                                className={`p-3 rounded-xl text-sm font-medium border flex items-center justify-between ${borderClass} ${bgClass} ${textClass}`}
+                              >
+                                <div className="flex items-center flex-1 break-words pr-2">
+                                  <span className="font-black mr-2 opacity-40 flex-shrink-0">
+                                    {String.fromCharCode(65 + oIdx)}.
+                                  </span>
+                                  <span>{opt}</span>
+                                </div>
+                                {isCorrectChoice && (
+                                  <span className="text-[8px] font-black uppercase tracking-widest bg-emerald-500 text-white px-1.5 py-0.5 rounded">
+                                    Benar
+                                  </span>
+                                )}
+                                {isStudentChoice && !isCorrectChoice && (
+                                  <span className="text-[8px] font-black uppercase tracking-widest bg-red-500 text-white px-1.5 py-0.5 rounded">
+                                    Pilihanmu
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="p-6 md:p-8 bg-brand-cream/30 border-t border-brand-navy/5">
+                <button
+                  onClick={() => setViewingHistory(null)}
+                  className="w-full bg-brand-navy text-white font-black py-4 rounded-2xl hover:bg-brand-black transition-all shadow-lg shadow-brand-navy/20"
+                >
+                  Tutup Tinjauan
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* View Material Modal */}
       {viewingMaterial && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-sm animate-in fade-in">
@@ -862,9 +1199,10 @@ export default function SiswaDashboard() {
                   ))}
                 </div>
               ) : viewingMaterial.content ? (
-                <div className="prose prose-sm md:prose-base max-w-none text-brand-navy/80 whitespace-pre-wrap">
-                  {viewingMaterial.content}
-                </div>
+                <div 
+                  className="prose prose-sm md:prose-base max-w-none text-brand-navy/80"
+                  dangerouslySetInnerHTML={{ __html: viewingMaterial.content }}
+                />
               ) : viewingMaterial.fileUrl ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <FileText className="w-16 h-16 text-brand-orange mb-4" />

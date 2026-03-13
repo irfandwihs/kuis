@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { GoogleGenAI, Type } from "@google/genai";
+import RichTextEditor from "@/components/RichTextEditor";
 import Avatar from "@/components/Avatar";
 import {
   BarChart,
@@ -82,6 +83,18 @@ interface Material {
   fileUrl?: string;
   fileName?: string;
   order: number;
+  createdAt: any;
+}
+
+interface Assignment {
+  id: string;
+  guruId: string;
+  subject: string;
+  title: string;
+  description: string;
+  content: string;
+  deadline?: any;
+  targetClass: string;
   createdAt: any;
 }
 
@@ -177,6 +190,18 @@ export default function GuruDashboard() {
   );
   const [viewingMaterial, setViewingMaterial] = useState<Material | null>(null);
 
+  // Assignment State
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [isCreatingAssignment, setIsCreatingAssignment] = useState(false);
+  const [assignmentTitle, setAssignmentTitle] = useState("");
+  const [assignmentDesc, setAssignmentDesc] = useState("");
+  const [assignmentContent, setAssignmentContent] = useState("");
+  const [assignmentDeadline, setAssignmentDeadline] = useState("");
+  const [assignmentClass, setAssignmentClass] = useState("Semua Kelas");
+  const [isUploadingAssignment, setIsUploadingAssignment] = useState(false);
+  const [deletingAssignmentId, setDeletingAssignmentId] = useState<string | null>(null);
+  const [viewingAssignment, setViewingAssignment] = useState<Assignment | null>(null);
+
   const [viewingRoomLeaderboard, setViewingRoomLeaderboard] = useState<any[]>(
     [],
   );
@@ -233,6 +258,23 @@ export default function GuruDashboard() {
     }
   }, [userData?.uid]);
 
+  const fetchAssignments = useCallback(async () => {
+    if (!userData?.uid) return;
+    try {
+      const q = query(
+        collection(db, "assignments"),
+        where("guruId", "==", userData.uid),
+        orderBy("createdAt", "desc"),
+      );
+      const snapshot = await getDocs(q);
+      setAssignments(
+        snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Assignment),
+      );
+    } catch (error) {
+      console.error("Error fetching assignments:", error);
+    }
+  }, [userData?.uid]);
+
   const fetchTopStudents = useCallback(async () => {
     try {
       const q = query(
@@ -276,7 +318,7 @@ export default function GuruDashboard() {
           if (data.status === "finished") {
             const score = data.score || 0;
             const className = data.studentClass || "Tanpa Kelas";
-            const quizTitle = room.quizTitle || "Kuis Tanpa Judul";
+            const quizTitle = room.quizTitle || quizzes.find(q => q.id === room.quizId)?.title || "Kuis Tanpa Judul";
             const date = room.createdAt?.toDate()?.toLocaleDateString("id-ID", { month: "short", day: "numeric" }) || "Unknown";
 
             // Class Stats
@@ -330,7 +372,7 @@ export default function GuruDashboard() {
     } finally {
       setIsFetchingAnalytics(false);
     }
-  }, [userData?.uid, rooms]);
+  }, [userData?.uid, rooms, quizzes]);
 
   useEffect(() => {
     if (mainTab === "analitik" && !analyticsData) {
@@ -381,6 +423,7 @@ export default function GuruDashboard() {
           fetchRooms(),
           fetchTopStudents(),
           fetchMaterials(),
+          fetchAssignments(),
         ]);
         setIsLoading(false);
       }
@@ -437,22 +480,23 @@ export default function GuruDashboard() {
 
         let prompt = "";
         let optionsDescription = "";
+        const commonInstructions = " PENTING: 1. Buatlah pilihan jawaban pengecoh (distractor) yang memiliki panjang teks yang hampir sama dengan jawaban yang benar agar tidak mudah ditebak. 2. Hindari pola yang mudah ditebak pada urutan jawaban benar. 3. Untuk pertanyaan Benar/Salah, pastikan urutan jawaban Benar dan Salah tidak membentuk pola yang berulang atau mudah dipahami siswa.";
 
         if (quizType === "true_false") {
-          prompt = `Buatlah kuis Benar/Salah tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pernyataan. Untuk setiap pertanyaan, berikan sebuah pernyataan. Pilihan jawaban (options) HARUS selalu ["Benar", "Salah"]. correctAnswerIndex adalah 0 jika pernyataan itu benar, dan 1 jika pernyataan itu salah.`;
+          prompt = `Buatlah kuis Benar/Salah tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pernyataan. Untuk setiap pertanyaan, berikan sebuah pernyataan. Pilihan jawaban (options) HARUS selalu ["Benar", "Salah"]. correctAnswerIndex adalah 0 jika pernyataan itu benar, dan 1 jika pernyataan itu salah.${commonInstructions}`;
           optionsDescription = 'Exactly 2 options: ["Benar", "Salah"]';
         } else if (quizType === "hidden_word") {
-          prompt = `Buatlah kuis pilihan ganda tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pertanyaan. Berikan 4 pilihan jawaban untuk setiap pertanyaan. SELAIN ITU, berikan satu KATA RAHASIA (hiddenWord) yang berkaitan erat dengan topik ${topic}. Kata rahasia ini sebaiknya terdiri dari 5 hingga 10 huruf tanpa spasi, gunakan huruf kapital semua.`;
+          prompt = `Buatlah kuis pilihan ganda tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pertanyaan. Berikan 4 pilihan jawaban untuk setiap pertanyaan. SELAIN ITU, berikan satu KATA RAHASIA (hiddenWord) yang berkaitan erat dengan topik ${topic}. Kata rahasia ini sebaiknya terdiri dari 5 hingga 10 huruf tanpa spasi, gunakan huruf kapital semua.${commonInstructions}`;
           optionsDescription = "Exactly 4 options";
         } else if (quizType === "mixed_1") {
-          prompt = `Buatlah kuis campuran tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pertanyaan. Campurkan pertanyaan pilihan ganda (4 pilihan) dan pertanyaan Benar/Salah (2 pilihan: ["Benar", "Salah"]). Untuk setiap pertanyaan, tentukan 'type' sebagai 'multiple_choice' atau 'true_false'.`;
+          prompt = `Buatlah kuis campuran tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pertanyaan. Campurkan pertanyaan pilihan ganda (4 pilihan) dan pertanyaan Benar/Salah (2 pilihan: ["Benar", "Salah"]). Untuk setiap pertanyaan, tentukan 'type' sebagai 'multiple_choice' atau 'true_false'.${commonInstructions}`;
           optionsDescription = 'Either 4 options or exactly 2 options: ["Benar", "Salah"]';
         } else if (quizType === "mixed_2") {
-          prompt = `Buatlah kuis campuran tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pertanyaan. Campurkan pertanyaan pilihan ganda (4 pilihan), pertanyaan Benar/Salah (2 pilihan: ["Benar", "Salah"]), dan pertanyaan berburu bebek (4 pilihan). Untuk setiap pertanyaan, tentukan 'type' sebagai 'multiple_choice', 'true_false', atau 'duck_hunt'.`;
+          prompt = `Buatlah kuis campuran tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pertanyaan. Campurkan pertanyaan pilihan ganda (4 pilihan), pertanyaan Benar/Salah (2 pilihan: ["Benar", "Salah"]), dan pertanyaan berburu bebek (4 pilihan). Untuk setiap pertanyaan, tentukan 'type' sebagai 'multiple_choice', 'true_false', atau 'duck_hunt'.${commonInstructions}`;
           optionsDescription = 'Either 4 options or exactly 2 options: ["Benar", "Salah"]';
         } else {
           // Both multiple_choice and duck_hunt use 4 options
-          prompt = `Buatlah kuis pilihan ganda tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pertanyaan. Berikan 4 pilihan jawaban untuk setiap pertanyaan.`;
+          prompt = `Buatlah kuis pilihan ganda tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pertanyaan. Berikan 4 pilihan jawaban untuk setiap pertanyaan.${commonInstructions}`;
           optionsDescription = "Exactly 4 options";
         }
 
@@ -562,10 +606,14 @@ export default function GuruDashboard() {
   };
 
   const createRoom = async (quizId: string) => {
+    const quiz = quizzes.find((q) => q.id === quizId);
+    const quizTitle = quiz ? quiz.title : "Kuis Tanpa Judul";
+    
     const roomCode = Math.floor(100000 + Math.random() * 900000).toString();
     const roomRef = await addDoc(collection(db, "rooms"), {
       roomCode,
       quizId,
+      quizTitle,
       guruId: userData?.uid,
       status: "waiting",
       targetClass: selectedClass,
@@ -644,8 +692,8 @@ export default function GuruDashboard() {
       return;
     }
 
-    if (materialType === "text" && materialPoints.every((p) => !p.trim())) {
-      alert("Konten materi harus diisi minimal 1 poin.");
+    if (materialType === "text" && !materialContent.trim()) {
+      alert("Konten materi harus diisi.");
       return;
     }
 
@@ -661,11 +709,8 @@ export default function GuruDashboard() {
         subject: userData?.subject,
         title: materialTitle,
         description: materialDesc,
-        content: "",
-        points:
-          materialType === "text"
-            ? materialPoints.filter((p) => p.trim() !== "")
-            : [],
+        content: materialType === "text" ? materialContent : "",
+        points: [],
         fileUrl: materialType === "link" ? materialLink : "",
         fileName: materialType === "link" ? "Link Eksternal" : "",
         order: materials.length + 1,
@@ -687,6 +732,58 @@ export default function GuruDashboard() {
       alert(`Gagal membuat materi: ${error.message}`);
     } finally {
       setIsUploadingMaterial(false);
+    }
+  };
+
+  const handleCreateAssignment = async () => {
+    if (!assignmentTitle.trim() || !assignmentContent.trim()) {
+      alert("Judul dan konten tugas harus diisi.");
+      return;
+    }
+
+    setIsUploadingAssignment(true);
+    try {
+      const newAssignment = {
+        guruId: userData?.uid,
+        subject: userData?.subject,
+        title: assignmentTitle,
+        description: assignmentDesc,
+        content: assignmentContent,
+        deadline: assignmentDeadline ? new Date(assignmentDeadline) : null,
+        targetClass: assignmentClass,
+        createdAt: new Date(),
+      };
+
+      await addDoc(collection(db, "assignments"), newAssignment);
+      await fetchAssignments();
+
+      setIsCreatingAssignment(false);
+      setAssignmentTitle("");
+      setAssignmentDesc("");
+      setAssignmentContent("");
+      setAssignmentDeadline("");
+    } catch (error: any) {
+      console.error("Error creating assignment:", error);
+      alert(`Gagal membuat tugas: ${error.message}`);
+    } finally {
+      setIsUploadingAssignment(false);
+    }
+  };
+
+  const deleteAssignment = async (id: string) => {
+    if (deletingAssignmentId !== id) {
+      setDeletingAssignmentId(id);
+      setTimeout(() => setDeletingAssignmentId(null), 3000);
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, "assignments", id));
+      await fetchAssignments();
+      setDeletingAssignmentId(null);
+    } catch (error: any) {
+      console.error("Error deleting assignment:", error);
+      alert(`Gagal menghapus: ${error.message}`);
     }
   };
 
@@ -1140,6 +1237,12 @@ export default function GuruDashboard() {
                           {room.status}
                         </span>
                       </div>
+                      <div className="mb-4 flex items-center gap-2">
+                        <Users className="w-4 h-4 text-brand-navy/40" />
+                        <span className="text-[10px] font-bold text-brand-navy/60 uppercase tracking-widest">
+                          {room.targetClass === "Semua Kelas" || !room.targetClass ? "Semua Kelas" : `Kelas ${room.targetClass}`}
+                        </span>
+                      </div>
                       <div className="flex justify-between items-center gap-2">
                         <button
                           onClick={() =>
@@ -1283,8 +1386,12 @@ export default function GuruDashboard() {
                         className="p-5 bg-brand-cream/30 rounded-3xl border border-brand-navy/5 hover:border-brand-orange/20 transition-all flex justify-between items-center group"
                       >
                         <div>
-                          <h3 className="font-black text-brand-navy text-base mb-1">
-                            {room.quizTitle || "Kuis Tanpa Judul"}
+                          <h3 className="font-black text-brand-navy text-base mb-1 flex items-center gap-2">
+                            {room.quizTitle || quizzes.find(q => q.id === room.quizId)?.title || "Kuis Tanpa Judul"}
+                            <span className="text-[10px] font-bold text-brand-navy/60 uppercase tracking-widest bg-brand-navy/5 px-2 py-0.5 rounded-md flex items-center gap-1">
+                              <Users className="w-3 h-3" />
+                              {room.targetClass === "Semua Kelas" || !room.targetClass ? "Semua Kelas" : `Kelas ${room.targetClass}`}
+                            </span>
                           </h3>
                           <div className="flex items-center gap-3">
                             <span className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest">
@@ -1560,16 +1667,76 @@ export default function GuruDashboard() {
         )}
 
         {mainTab === "tugas" && (
-          <div className="flex flex-col items-center justify-center py-12 text-center animate-in fade-in zoom-in-95 duration-300">
-            <div className="w-20 h-20 bg-brand-cream/50 text-brand-navy/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
-              <FileText className="w-10 h-10" />
-            </div>
-            <h2 className="text-2xl font-black text-brand-navy mb-2 tracking-tight">
-              Tugas
-            </h2>
-            <p className="text-brand-navy/60 text-sm font-medium">
-              Belum ada tugas yang diberikan.
-            </p>
+          <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+            <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5">
+              <div className="flex items-center justify-between mb-6 md:mb-8">
+                <h2 className="text-xl md:text-2xl font-black text-brand-navy flex items-center gap-3 tracking-tight">
+                  <FileText className="w-6 h-6 md:w-7 md:h-7 text-brand-orange" />
+                  Manajemen Tugas
+                </h2>
+                <button
+                  onClick={() => setIsCreatingAssignment(true)}
+                  className="bg-brand-navy text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-brand-black transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> Tambah Tugas
+                </button>
+              </div>
+
+              {assignments.length === 0 ? (
+                <div className="text-center py-12 md:py-16 bg-brand-cream/30 rounded-[32px] border-2 border-dashed border-brand-navy/10">
+                  <FileText className="w-10 h-10 md:w-12 md:h-12 text-brand-navy/20 mx-auto mb-4" />
+                  <p className="text-brand-navy/40 text-sm font-bold">
+                    Belum ada tugas. Buat tugas pertama Anda!
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {assignments.map((asg) => (
+                    <div
+                      key={asg.id}
+                      className="p-6 bg-white border-2 border-brand-navy/5 rounded-3xl hover:border-brand-orange transition-all group relative"
+                    >
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="px-2 py-1 bg-brand-orange/10 text-brand-orange text-[10px] font-black uppercase tracking-widest rounded-md">
+                            {asg.targetClass}
+                          </span>
+                          {asg.deadline && (
+                            <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest">
+                              Deadline: {asg.deadline.toDate().toLocaleDateString("id-ID")}
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="font-black text-brand-navy text-lg mb-1 group-hover:text-brand-orange transition-colors">
+                          {asg.title}
+                        </h3>
+                        <p className="text-xs text-brand-navy/40 font-medium line-clamp-2">
+                          {asg.description}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setViewingAssignment(asg)}
+                          className="flex-1 bg-brand-navy text-white py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-black transition-colors"
+                        >
+                          Lihat Detail
+                        </button>
+                        <button
+                          onClick={() => deleteAssignment(asg.id)}
+                          className={`px-4 rounded-2xl transition-all flex items-center justify-center ${
+                            deletingAssignmentId === asg.id
+                              ? "bg-red-500 text-white"
+                              : "bg-red-50 text-red-500 hover:bg-red-100"
+                          }`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
         )}
 
@@ -2212,6 +2379,155 @@ export default function GuruDashboard() {
         </div>
       )}
 
+      {/* Create Assignment Modal */}
+      {isCreatingAssignment && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-2xl max-h-[90vh] rounded-[40px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-6 md:p-8 border-b border-brand-navy/5 flex justify-between items-center bg-brand-cream/30">
+              <div>
+                <h2 className="text-xl md:text-2xl font-black text-brand-navy tracking-tight">
+                  Buat Tugas Baru
+                </h2>
+                <p className="text-brand-navy/40 text-[10px] font-black uppercase tracking-widest">
+                  Mata Pelajaran: {userData.subject}
+                </p>
+              </div>
+              <button
+                onClick={() => setIsCreatingAssignment(false)}
+                className="p-2 hover:bg-brand-navy/5 rounded-full transition-colors text-brand-navy/40 hover:text-brand-navy"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
+                    Target Kelas
+                  </label>
+                  <select
+                    value={assignmentClass}
+                    onChange={(e) => setAssignmentClass(e.target.value)}
+                    className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange outline-none font-bold text-brand-navy text-sm mt-2 transition-all"
+                  >
+                    <option value="Semua Kelas">Semua Kelas</option>
+                    {availableClasses.map((c) => (
+                      <option key={c} value={c}>
+                        Kelas {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
+                    Tenggat Waktu (Opsional)
+                  </label>
+                  <input
+                    type="date"
+                    value={assignmentDeadline}
+                    onChange={(e) => setAssignmentDeadline(e.target.value)}
+                    className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange outline-none font-bold text-brand-navy text-sm mt-2 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
+                  Judul Tugas
+                </label>
+                <input
+                  type="text"
+                  value={assignmentTitle}
+                  onChange={(e) => setAssignmentTitle(e.target.value)}
+                  placeholder="Contoh: Laporan Praktikum Biologi"
+                  className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange outline-none font-bold text-brand-navy text-sm mt-2 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
+                  Deskripsi Singkat
+                </label>
+                <input
+                  type="text"
+                  value={assignmentDesc}
+                  onChange={(e) => setAssignmentDesc(e.target.value)}
+                  placeholder="Instruksi singkat tentang tugas ini..."
+                  className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange outline-none font-bold text-brand-navy text-sm mt-2 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1 mb-2 block">
+                  Instruksi Lengkap (Rich Text)
+                </label>
+                <RichTextEditor
+                  content={assignmentContent}
+                  onChange={setAssignmentContent}
+                  placeholder="Tulis instruksi tugas selengkap mungkin di sini..."
+                />
+              </div>
+            </div>
+
+            <div className="p-6 md:p-8 border-t border-brand-navy/5 bg-white">
+              <button
+                onClick={handleCreateAssignment}
+                disabled={isUploadingAssignment}
+                className="w-full bg-brand-navy text-white py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 hover:bg-brand-black shadow-xl shadow-brand-navy/20 transition-all active:scale-95 disabled:opacity-50"
+              >
+                {isUploadingAssignment ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Menyimpan...
+                  </>
+                ) : (
+                  "Publikasikan Tugas"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Assignment Modal */}
+      {viewingAssignment && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-3xl max-h-[90vh] rounded-[40px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-6 md:p-8 border-b border-brand-navy/5 flex justify-between items-center bg-brand-cream/30">
+              <div>
+                <div className="flex gap-2 mb-2">
+                  <span className="px-2 py-1 bg-brand-orange/10 text-brand-orange text-[10px] font-black uppercase tracking-widest rounded-md">
+                    {viewingAssignment.targetClass}
+                  </span>
+                  {viewingAssignment.deadline && (
+                    <span className="px-2 py-1 bg-red-50 text-red-500 text-[10px] font-black uppercase tracking-widest rounded-md">
+                      Deadline: {viewingAssignment.deadline.toDate().toLocaleDateString("id-ID")}
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-xl md:text-2xl font-black text-brand-navy tracking-tight">
+                  {viewingAssignment.title}
+                </h2>
+              </div>
+              <button
+                onClick={() => setViewingAssignment(null)}
+                className="p-2 hover:bg-brand-navy/5 rounded-full transition-colors text-brand-navy/40 hover:text-brand-navy"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 md:p-8">
+              <div 
+                className="prose prose-sm md:prose-base max-w-none text-brand-navy/80"
+                dangerouslySetInnerHTML={{ __html: viewingAssignment.content }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Create Material Modal */}
       {isCreatingMaterial && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-sm animate-in fade-in">
@@ -2301,48 +2617,18 @@ export default function GuruDashboard() {
               {materialType === "text" ? (
                 <div className="space-y-4">
                   <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
-                    Poin-poin Materi (Roadmap)
+                    Konten Materi (Rich Text)
                   </label>
-                  <div className="space-y-3">
-                    {materialPoints.map((point, idx) => (
-                      <div key={idx} className="flex gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-brand-navy text-white flex items-center justify-center font-black text-xs flex-shrink-0">
-                          {idx + 1}
-                        </div>
-                        <textarea
-                          value={point}
-                          onChange={(e) => {
-                            const newPoints = [...materialPoints];
-                            newPoints[idx] = e.target.value;
-                            setMaterialPoints(newPoints);
-                          }}
-                          placeholder={`Ketik poin materi ke-${idx + 1}...`}
-                          className={`flex-1 p-4 bg-brand-cream/50 border-2 rounded-2xl focus:border-brand-orange outline-none font-medium text-brand-navy text-sm min-h-[80px] resize-none transition-all ${
-                            showMaterialErrors && !point.trim()
-                              ? "border-red-500 bg-red-50"
-                              : "border-transparent"
-                          }`}
-                        />
-                        <button
-                          onClick={() => {
-                            const newPoints = [...materialPoints];
-                            newPoints.splice(idx, 1);
-                            setMaterialPoints(newPoints);
-                          }}
-                          disabled={materialPoints.length === 1}
-                          className="p-3 text-red-500 hover:bg-red-50 rounded-xl disabled:opacity-0"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => setMaterialPoints([...materialPoints, ""])}
-                    className="w-full py-3 border-2 border-dashed border-brand-navy/10 rounded-2xl text-brand-navy/40 font-black text-[10px] uppercase tracking-widest hover:border-brand-orange hover:text-brand-orange transition-all"
-                  >
-                    + Tambah Poin Materi
-                  </button>
+                  <RichTextEditor
+                    content={materialContent}
+                    onChange={setMaterialContent}
+                    placeholder="Tulis materi pembelajaran di sini..."
+                  />
+                  {showMaterialErrors && !materialContent.trim() && (
+                    <p className="text-red-500 text-[10px] font-bold uppercase tracking-widest ml-1">
+                      Konten materi tidak boleh kosong
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div>

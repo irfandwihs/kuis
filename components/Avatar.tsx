@@ -108,7 +108,15 @@ export default function Avatar({
           {/* Preload all other images to prevent flickering when switching */}
           <div className="hidden">
             {AVATAR_IMAGES.map((url, i) => (
-              <img key={i} src={url} alt="" referrerPolicy="no-referrer" />
+              <div key={i} className="relative w-1 h-1">
+                <Image
+                  src={url}
+                  alt=""
+                  fill
+                  unoptimized
+                  referrerPolicy="no-referrer"
+                />
+              </div>
             ))}
           </div>
         </div>

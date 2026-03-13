@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { collection, query, where, onSnapshot, doc, updateDoc, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { Users, Play, Square, ArrowLeft, CheckCircle2, Circle, Clock, FileText, Download, X, Flag } from "lucide-react";
+import { Users, Play, Square, ArrowLeft, CheckCircle2, Circle, Clock, FileText, Download, X, Flag, Activity, WifiOff, Wifi, RotateCcw, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import Avatar from "@/components/Avatar";
 
@@ -16,6 +16,12 @@ export default function GuruRoom() {
   const [room, setRoom] = useState<any>(null);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [showReport, setShowReport] = useState(false);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+
+  const selectedStudentActivity = useMemo(() => {
+    if (!selectedStudentId) return null;
+    return leaderboard.find(s => s.id === selectedStudentId) || null;
+  }, [selectedStudentId, leaderboard]);
 
   useEffect(() => {
     if (!roomCode) return;
@@ -49,7 +55,7 @@ export default function GuruRoom() {
   const downloadCSV = () => {
     if (leaderboard.length === 0) return;
 
-    const headers = ["Peringkat", "Nama Siswa", "Kelas", "No Absen", "Skor (XP)", "Status"];
+    const headers = ["Peringkat", "Nama Siswa", "Kelas", "No Absen", "Skor (XP)", "Status", "Percobaan", "Indikasi Curang"];
     const csvContent = [
       headers.join(","),
       ...leaderboard.map((entry, index) => {
@@ -59,7 +65,9 @@ export default function GuruRoom() {
           `"${entry.studentClass || "-"}"`,
           `"${entry.studentAbsen || "-"}"`,
           entry.score,
-          entry.status === "finished" ? "Selesai" : "Belum Selesai"
+          entry.status === "finished" ? "Selesai" : "Belum Selesai",
+          entry.attempts || 1,
+          entry.cheated ? "Ya" : "Tidak"
         ].join(",");
       })
     ].join("\n");
@@ -90,8 +98,14 @@ export default function GuruRoom() {
 
         <div className="bg-white p-8 md:p-12 rounded-[40px] shadow-sm text-center mb-6 border border-brand-navy/5">
           <h1 className="text-brand-navy/40 font-black uppercase tracking-[0.2em] text-[10px] mb-4">Kode Ruangan</h1>
-          <div className="text-5xl md:text-7xl font-mono font-black tracking-[0.2em] text-brand-navy mb-10">
+          <div className="text-5xl md:text-7xl font-mono font-black tracking-[0.2em] text-brand-navy mb-4">
             {roomCode}
+          </div>
+          <div className="flex justify-center mb-10">
+            <span className="text-xs font-bold text-brand-navy/60 uppercase tracking-widest bg-brand-cream px-4 py-2 rounded-xl flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              {room.targetClass === "Semua Kelas" || !room.targetClass ? "Semua Kelas" : `Kelas ${room.targetClass}`}
+            </span>
           </div>
           
           <div className="flex flex-col gap-4">
@@ -209,6 +223,27 @@ export default function GuruRoom() {
                         ))}
                       </div>
                     </div>
+
+                    {/* Activity Log Toggle */}
+                    <div className="mt-4 pt-4 border-t border-brand-navy/5">
+                      <button
+                        onClick={() => setSelectedStudentId(entry.id)}
+                        className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-brand-navy/40 hover:text-brand-orange transition-colors"
+                      >
+                        <Activity className="w-3 h-3" />
+                        Lihat Aktivitas & Percobaan
+                        {entry.attempts > 1 && (
+                          <span className="bg-brand-orange/10 text-brand-orange px-2 py-0.5 rounded-full">
+                            {entry.attempts} Percobaan
+                          </span>
+                        )}
+                        {entry.cheated && (
+                          <span className="bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" /> Indikasi Curang
+                          </span>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -216,6 +251,91 @@ export default function GuruRoom() {
           )}
         </div>
       </div>
+
+      {/* Activity Modal */}
+      <AnimatePresence>
+        {selectedStudentActivity && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-sm animate-in fade-in">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white w-full max-w-2xl max-h-[90vh] rounded-[48px] shadow-2xl flex flex-col overflow-hidden"
+            >
+              <div className="p-8 border-b border-brand-navy/5 flex items-center justify-between bg-brand-cream/20">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-brand-orange rounded-2xl flex items-center justify-center shadow-lg shadow-brand-orange/20">
+                    <Activity className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-brand-navy tracking-tight">Aktivitas & Percobaan</h2>
+                    <p className="text-xs font-bold text-brand-navy/40 uppercase tracking-widest">{selectedStudentActivity.siswaName}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedStudentId(null)}
+                  className="p-3 bg-white rounded-2xl text-brand-navy/20 hover:text-red-500 transition-all shadow-sm"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-brand-cream/10">
+                {selectedStudentActivity.activityLog && selectedStudentActivity.activityLog.length > 0 ? (
+                  <div className="space-y-4">
+                    {selectedStudentActivity.activityLog.map((log: any, logIdx: number) => (
+                      <div key={logIdx} className="flex items-start gap-4 p-4 bg-white rounded-3xl border border-brand-navy/5 shadow-sm">
+                        <div className={`mt-1 p-2 rounded-xl ${
+                          log.type === 'started' ? 'bg-sky-500/10 text-sky-500' :
+                          log.type === 'resumed' ? 'bg-brand-orange/10 text-brand-orange' :
+                          log.type === 'restarted' ? 'bg-purple-500/10 text-purple-500' :
+                          log.type === 'offline' ? 'bg-red-500/10 text-red-500' :
+                          log.type === 'online' ? 'bg-emerald-500/10 text-emerald-500' :
+                          log.type === 'cheated' ? 'bg-red-500/10 text-red-500' :
+                          log.type === 'finished' ? 'bg-emerald-500/10 text-emerald-500' :
+                          'bg-brand-navy/10 text-brand-navy'
+                        }`}>
+                          {log.type === 'started' && <Play className="w-5 h-5" />}
+                          {log.type === 'resumed' && <RotateCcw className="w-5 h-5" />}
+                          {log.type === 'restarted' && <RotateCcw className="w-5 h-5" />}
+                          {log.type === 'offline' && <WifiOff className="w-5 h-5" />}
+                          {log.type === 'online' && <Wifi className="w-5 h-5" />}
+                          {log.type === 'cheated' && <AlertTriangle className="w-5 h-5" />}
+                          {log.type === 'finished' && <CheckCircle2 className="w-5 h-5" />}
+                        </div>
+                        <div>
+                          <div className="font-black text-brand-navy text-sm mb-1">
+                            {log.type === 'started' && 'Memulai Kuis'}
+                            {log.type === 'resumed' && 'Melanjutkan Kuis'}
+                            {log.type === 'restarted' && 'Mengulang Kuis'}
+                            {log.type === 'offline' && 'Koneksi Terputus / Keluar'}
+                            {log.type === 'online' && 'Kembali Online'}
+                            {log.type === 'cheated' && 'Peringatan Sistem'}
+                            {log.type === 'finished' && 'Menyelesaikan Kuis'}
+                          </div>
+                          <div className="text-xs font-bold text-brand-navy/60">
+                            {log.timestamp?.toDate ? new Date(log.timestamp.toDate()).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'medium' }) : ''}
+                          </div>
+                          {log.message && (
+                            <div className="mt-2 text-sm text-brand-navy bg-brand-cream/50 p-3 rounded-xl border border-brand-navy/5">
+                              {log.message}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 bg-white rounded-3xl border-2 border-dashed border-brand-navy/10">
+                    <Activity className="w-10 h-10 md:w-12 md:h-12 text-brand-navy/20 mx-auto mb-4" />
+                    <p className="text-brand-navy/40 text-sm font-bold">Belum ada aktivitas yang tercatat.</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Report Modal */}
       <AnimatePresence>
@@ -265,13 +385,15 @@ export default function GuruRoom() {
                           <th className="p-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest">Kelas</th>
                           <th className="p-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest text-center">No Absen</th>
                           <th className="p-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest text-right">Skor (XP)</th>
+                          <th className="p-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest text-center">Percobaan</th>
+                          <th className="p-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest text-center">Curang</th>
                           <th className="p-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest text-center">Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {leaderboard.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="p-8 text-center text-brand-navy/40 text-sm font-bold">Belum ada data siswa.</td>
+                            <td colSpan={8} className="p-8 text-center text-brand-navy/40 text-sm font-bold">Belum ada data siswa.</td>
                           </tr>
                         ) : (
                           leaderboard.map((entry, idx) => (
@@ -295,6 +417,14 @@ export default function GuruRoom() {
                               <td className="p-4 text-sm font-bold text-brand-navy/60">{entry.studentClass || "-"}</td>
                               <td className="p-4 text-sm font-bold text-brand-navy/60 text-center">{entry.studentAbsen || "-"}</td>
                               <td className="p-4 text-right font-black text-brand-orange">{entry.score}</td>
+                              <td className="p-4 text-center text-sm font-bold text-brand-navy/60">{entry.attempts || 1}</td>
+                              <td className="p-4 text-center">
+                                {entry.cheated ? (
+                                  <span className="bg-red-500/10 text-red-500 px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Ya</span>
+                                ) : (
+                                  <span className="bg-brand-navy/5 text-brand-navy/40 px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Tidak</span>
+                                )}
+                              </td>
                               <td className="p-4 text-center">
                                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
                                   entry.status === "finished" ? "bg-emerald-50 text-emerald-600" : "bg-brand-orange/10 text-brand-orange"

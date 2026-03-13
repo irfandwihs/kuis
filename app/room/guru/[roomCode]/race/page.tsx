@@ -66,7 +66,14 @@ export default function RaceMode() {
               <Flag className="w-5 h-5 md:w-6 md:h-6 text-brand-orange shrink-0" />
               MODE BALAPAN
             </h1>
-            <p className="text-white/50 text-[10px] md:text-xs font-black uppercase tracking-[0.2em]">Ruangan: {roomCode}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-white/50 text-[10px] md:text-xs font-black uppercase tracking-[0.2em]">Ruangan: {roomCode}</p>
+              <span className="text-white/30 text-[10px]">•</span>
+              <p className="text-white/50 text-[10px] md:text-xs font-black uppercase tracking-[0.2em] flex items-center gap-1">
+                <Users className="w-3 h-3" />
+                {room.targetClass === "Semua Kelas" || !room.targetClass ? "Semua Kelas" : `Kelas ${room.targetClass}`}
+              </p>
+            </div>
           </div>
         </div>
         
