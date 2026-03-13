@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
-import { collection, getDocs, query, orderBy, doc, updateDoc, deleteDoc, setDoc, where } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, doc, updateDoc, deleteDoc, setDoc, where, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { ShieldCheck, Mail, Star, Diamond, Users, BookOpen, Trash2, Edit3, RotateCcw, X, Save, Search } from "lucide-react";
 import Avatar from "@/components/Avatar";
@@ -20,6 +20,8 @@ export default function AdminDashboard() {
   const [isAdminInitialized, setIsAdminInitialized] = useState<boolean | null>(null);
   const [testResult, setTestResult] = useState<{ success: boolean; message?: string; error?: string } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
+  const [classFilter, setClassFilter] = useState("");
+  const [isResettingAll, setIsResettingAll] = useState(false);
 
   // Hardcoded admin email as requested
   const ADMIN_EMAIL = "irfandwi.hs@gmail.com";
@@ -171,6 +173,63 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleResetAllStudents = async () => {
+    const targetStudents = classFilter 
+      ? allUsers.filter(u => u.role === "Siswa" && u.studentClass === classFilter)
+      : allUsers.filter(u => u.role === "Siswa");
+
+    if (targetStudents.length === 0) {
+      alert("Tidak ada siswa yang ditemukan untuk direset.");
+      return;
+    }
+
+    const confirmMessage = classFilter 
+      ? `PERINGATAN: Apakah Anda yakin ingin mereset XP, Diamond, dan Inventory SEMUA SISWA di kelas ${classFilter}? (${targetStudents.length} siswa)`
+      : `PERINGATAN: Apakah Anda yakin ingin mereset XP, Diamond, dan Inventory SEMUA SISWA? (${targetStudents.length} siswa)`;
+
+    if (!confirm(confirmMessage)) return;
+    
+    setIsResettingAll(true);
+    try {
+      const chunkSize = 400;
+      for (let i = 0; i < targetStudents.length; i += chunkSize) {
+        const chunk = targetStudents.slice(i, i + chunkSize);
+        const currentBatch = writeBatch(db);
+        chunk.forEach(student => {
+          const userRef = doc(db, "users", student.id);
+          currentBatch.update(userRef, {
+            xp: 0,
+            diamonds: 0,
+            quizzesPlayed: 0,
+            inventory: {}
+          });
+        });
+        await currentBatch.commit();
+      }
+      
+      const targetIds = new Set(targetStudents.map(s => s.id));
+      setAllUsers(prev => prev.map(u => {
+        if (targetIds.has(u.id)) {
+          return {
+            ...u,
+            xp: 0,
+            diamonds: 0,
+            quizzesPlayed: 0,
+            inventory: {}
+          };
+        }
+        return u;
+      }));
+      
+      alert(`Berhasil mereset data ${targetStudents.length} siswa.`);
+    } catch (error) {
+      console.error("Error resetting students:", error);
+      alert("Gagal mereset siswa.");
+    } finally {
+      setIsResettingAll(false);
+    }
+  };
+
   if (loading || fetching || userData?.email !== ADMIN_EMAIL) {
     return (
       <div className="min-h-screen bg-brand-navy flex flex-col items-center justify-center">
@@ -184,10 +243,14 @@ export default function AdminDashboard() {
     );
   }
 
-  const filteredUsers = allUsers.filter(u => 
-    u.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.email?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const uniqueClasses = Array.from(new Set(allUsers.filter(u => u.role === "Siswa" && u.studentClass).map(u => u.studentClass))).sort();
+
+  const filteredUsers = allUsers.filter(u => {
+    const matchesSearch = u.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          u.email?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesClass = classFilter ? u.studentClass === classFilter : true;
+    return matchesSearch && matchesClass;
+  });
 
   const stats = {
     total: allUsers.length,
@@ -225,15 +288,37 @@ export default function AdminDashboard() {
           </div>
         </header>
 
-        <div className="mb-6 relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-navy/20" />
-          <input 
-            type="text"
-            placeholder="Cari nama atau email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-6 py-4 bg-white rounded-2xl border border-brand-navy/5 shadow-sm focus:border-brand-orange outline-none transition-all font-bold text-brand-navy"
-          />
+        <div className="mb-6 flex flex-col md:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-navy/20" />
+            <input 
+              type="text"
+              placeholder="Cari nama atau email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-6 py-4 bg-white rounded-2xl border border-brand-navy/5 shadow-sm focus:border-brand-orange outline-none transition-all font-bold text-brand-navy"
+            />
+          </div>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <select
+              value={classFilter}
+              onChange={(e) => setClassFilter(e.target.value)}
+              className="px-6 py-4 bg-white rounded-2xl border border-brand-navy/5 shadow-sm focus:border-brand-orange outline-none transition-all font-bold text-brand-navy cursor-pointer"
+            >
+              <option value="">Semua Kelas</option>
+              {uniqueClasses.map(cls => (
+                <option key={cls as string} value={cls as string}>{cls as string}</option>
+              ))}
+            </select>
+            <button
+              onClick={handleResetAllStudents}
+              disabled={isResettingAll}
+              className="px-6 py-4 bg-red-50 text-red-600 hover:bg-red-100 rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-2 disabled:opacity-50 whitespace-nowrap"
+            >
+              <RotateCcw className={`w-5 h-5 ${isResettingAll ? "animate-spin" : ""}`} />
+              {isResettingAll ? "Resetting..." : classFilter ? `Reset Kelas ${classFilter}` : "Reset Semua Siswa"}
+            </button>
+          </div>
         </div>
 
         {isAdminInitialized === false && (
