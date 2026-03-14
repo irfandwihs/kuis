@@ -1,0 +1,108 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Profil pengguna (Guru atau Siswa)",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["Guru", "Siswa", "Umum", "Master"] },
+        "avatar": { "type": "string" },
+        "xp": { "type": "number" },
+        "diamonds": { "type": "number" },
+        "studentClass": { "type": "string" },
+        "studentAbsen": { "type": "string" }
+      },
+      "required": ["displayName", "email", "role"]
+    },
+    "Quiz": {
+      "title": "Quiz",
+      "description": "Kuis yang dibuat oleh Guru",
+      "type": "object",
+      "properties": {
+        "guruId": { "type": "string" },
+        "subject": { "type": "string" },
+        "title": { "type": "string" },
+        "questions": { "type": "array" },
+        "quizType": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["guruId", "title", "questions"]
+    },
+    "Room": {
+      "title": "Room",
+      "description": "Ruangan kuis aktif",
+      "type": "object",
+      "properties": {
+        "roomCode": { "type": "string" },
+        "quizId": { "type": "string" },
+        "quizTitle": { "type": "string" },
+        "guruId": { "type": "string" },
+        "status": { "type": "string" },
+        "targetClass": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["roomCode", "quizId", "guruId", "status"]
+    },
+    "Material": {
+      "title": "Material",
+      "description": "Materi pembelajaran",
+      "type": "object",
+      "properties": {
+        "guruId": { "type": "string" },
+        "subject": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "content": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "fileName": { "type": "string" },
+        "order": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["guruId", "title"]
+    },
+    "Assignment": {
+      "title": "Assignment",
+      "description": "Tugas untuk siswa",
+      "type": "object",
+      "properties": {
+        "guruId": { "type": "string" },
+        "subject": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "content": { "type": "string" },
+        "deadline": { "type": "string", "format": "date-time" },
+        "targetClass": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["guruId", "title", "content"]
+    },
+    "Submission": {
+      "title": "Submission",
+      "description": "Pengumpulan tugas oleh siswa",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "content": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["submitted", "graded"] },
+        "grade": { "type": "number" },
+        "feedback": { "type": "string" }
+      },
+      "required": ["studentId", "content", "submittedAt"]
+    }
+  },
+  "firestore": {
+    "/users": { "schema": "User", "description": "Koleksi profil pengguna" },
+    "/users/{userId}/history": { "schema": "object", "description": "Riwayat kuis pengguna" },
+    "/quizzes": { "schema": "Quiz", "description": "Koleksi kuis" },
+    "/rooms": { "schema": "Room", "description": "Koleksi ruangan kuis" },
+    "/rooms/{roomId}/leaderboard": { "schema": "object", "description": "Leaderboard ruangan" },
+    "/materials": { "schema": "Material", "description": "Koleksi materi" },
+    "/assignments": { "schema": "Assignment", "description": "Koleksi tugas" },
+    "/assignments/{assignmentId}/submissions": { "schema": "Submission", "description": "Koleksi pengumpulan tugas" }
+  }
+}

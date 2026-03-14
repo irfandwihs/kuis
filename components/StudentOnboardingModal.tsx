@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "motion/react";
-import { User, GraduationCap, Check, Sparkles } from "lucide-react";
-import Avatar, { AVATAR_IMAGES } from "./Avatar";
-import Image from "next/image";
+import { User, GraduationCap, Check, Sparkles, RefreshCw } from "lucide-react";
+import Avatar, { DICEBEAR_STYLES } from "./Avatar";
 
 export default function StudentOnboardingModal() {
   const { userData, updateProfile } = useAuth();
@@ -15,12 +14,17 @@ export default function StudentOnboardingModal() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Character Creator State
-  const [avatarIdx, setAvatarIdx] = useState(0);
+  const [selectedStyle, setSelectedStyle] = useState(DICEBEAR_STYLES[0]);
+  const [seed, setSeed] = useState(Math.random().toString(36).substring(7));
 
   // If profile is already completed and has absence number, don't show
   if (userData?.profileCompleted && userData?.studentAbsen) return null;
 
-  const avatarString = avatarIdx.toString();
+  const avatarString = `${selectedStyle}:${seed}`;
+
+  const randomizeSeed = () => {
+    setSeed(Math.random().toString(36).substring(7));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +38,6 @@ export default function StudentOnboardingModal() {
         studentClass: studentClass,
         studentAbsen: studentAbsen
       });
-      // After update, AuthContext will have updated userData.role
     } catch (error) {
       console.error("Error updating profile:", error);
     } finally {
@@ -56,28 +59,37 @@ export default function StudentOnboardingModal() {
         <motion.div
           initial={{ opacity: 0, scale: 0.9, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[32px] md:rounded-[48px] shadow-2xl overflow-hidden border border-white/20 flex flex-col md:flex-row my-auto"
+          className="bg-white w-full max-w-5xl max-h-[95vh] rounded-[32px] md:rounded-[48px] shadow-2xl overflow-hidden border border-white/20 flex flex-col md:flex-row my-auto"
         >
           {/* Left Side: Preview */}
-          <div className="bg-brand-navy p-6 md:p-8 md:w-2/5 flex flex-col items-center justify-center text-center relative shrink-0">
+          <div className="bg-brand-navy p-6 md:p-10 md:w-2/5 flex flex-col items-center justify-center text-center relative shrink-0">
             <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
               <div className="absolute top-4 left-4 rotate-12"><Sparkles className="w-8 h-8 text-white" /></div>
               <div className="absolute bottom-4 right-4 -rotate-12"><GraduationCap className="w-8 h-8 text-white" /></div>
             </div>
             
-            <div className="relative mb-4 md:mb-6">
-              <div className="absolute -inset-4 bg-brand-orange/20 rounded-full blur-2xl animate-pulse" />
-              <Avatar avatarString={avatarString} size="xl" className="relative z-10 border-4 border-white shadow-2xl scale-75 md:scale-100" />
+            <div className="relative mb-6 md:mb-8">
+              <div className="absolute -inset-6 bg-brand-orange/20 rounded-full blur-3xl animate-pulse" />
+              <Avatar avatarString={avatarString} size="xl" className="relative z-10 border-4 border-white shadow-2xl scale-90 md:scale-110" />
             </div>
             
-            <h2 className="text-xl md:text-2xl font-black text-white tracking-tight mb-2">Pilih Avatarmu</h2>
-            <p className="text-white/60 text-[10px] md:text-xs font-medium">Capybara mana yang paling menggambarkan dirimu hari ini?</p>
+            <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-3">Avatar Builder</h2>
+            <p className="text-white/60 text-xs md:text-sm font-medium mb-6">Buat karakter unikmu sendiri!</p>
+            
+            <button
+              type="button"
+              onClick={randomizeSeed}
+              className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-2xl transition-all font-black uppercase tracking-widest text-xs border border-white/10 active:scale-95"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Acak Karakter
+            </button>
           </div>
 
           {/* Right Side: Controls */}
           <div className="flex-1 p-6 md:p-10 flex flex-col overflow-y-auto">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                   <label className="block text-[10px] font-black text-brand-navy/40 uppercase tracking-widest mb-2 ml-1">
                     Nama Panggilan
@@ -136,31 +148,29 @@ export default function StudentOnboardingModal() {
                 </div>
               </div>
 
-              {/* Avatar Grid Selection */}
+              {/* Avatar Style Selection */}
               <div>
                 <label className="block text-[10px] font-black text-brand-navy/40 uppercase tracking-widest mb-4 ml-1">
-                  Pilih Capybara
+                  Pilih Gaya Seni
                 </label>
-                <div className="grid grid-cols-3 gap-3 md:gap-4">
-                  {AVATAR_IMAGES.map((url, idx) => (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                  {DICEBEAR_STYLES.map((style) => (
                     <button
-                      key={idx}
+                      key={style}
                       type="button"
-                      onClick={() => setAvatarIdx(idx)}
+                      onClick={() => setSelectedStyle(style)}
                       className={`relative aspect-square rounded-2xl overflow-hidden border-4 transition-all ${
-                        avatarIdx === idx 
+                        selectedStyle === style 
                           ? "border-brand-orange shadow-lg shadow-brand-orange/20 scale-105 z-10" 
-                          : "border-transparent hover:border-brand-orange/30 hover:scale-105"
+                          : "border-transparent bg-brand-cream/30 hover:border-brand-orange/30 hover:scale-105"
                       }`}
                     >
-                      <Image 
-                        src={url}
-                        alt={`Avatar ${idx}`}
-                        fill
-                        className="object-cover"
-                        unoptimized
-                        referrerPolicy="no-referrer"
+                      <Avatar 
+                        avatarString={`${style}:preview`}
+                        size="sm"
+                        className="w-full h-full"
                       />
+                      <div className={`absolute inset-0 bg-brand-orange/10 transition-opacity ${selectedStyle === style ? "opacity-100" : "opacity-0"}`} />
                     </button>
                   ))}
                 </div>

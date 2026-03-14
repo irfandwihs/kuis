@@ -1,0 +1,169 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields:
+    //   - displayName: string
+    //   - email: string
+    //   - role: string ('Guru', 'Siswa', 'Umum')
+    //   - avatar: string
+    //   - xp: number
+    //   - diamonds: number
+    //   - studentClass: string
+    //   - studentAbsen: string
+    //
+    // Collection: quizzes
+    // Fields:
+    //   - guruId: string (UID)
+    //   - subject: string
+    //   - title: string
+    //   - questions: array
+    //   - quizType: string
+    //   - createdAt: timestamp
+    //
+    // Collection: rooms
+    // Fields:
+    //   - roomCode: string
+    //   - quizId: string
+    //   - quizTitle: string
+    //   - guruId: string (UID)
+    //   - status: string ('waiting', 'playing', 'finished')
+    //   - targetClass: string
+    //   - createdAt: timestamp
+    //
+    // Collection: materials
+    // Fields:
+    //   - guruId: string (UID)
+    //   - subject: string
+    //   - title: string
+    //   - description: string
+    //   - content: string
+    //   - fileUrl: string
+    //   - fileName: string
+    //   - order: number
+    //   - createdAt: timestamp
+    //
+    // Collection: assignments (Tugas)
+    // Fields:
+    //   - guruId: string (UID)
+    //   - subject: string
+    //   - title: string
+    //   - description: string
+    //   - content: string
+    //   - deadline: timestamp
+    //   - targetClass: string
+    //   - createdAt: timestamp
+    //
+    // ===============================================================
+
+    // Fungsi untuk mengecek apakah user adalah Master (Admin)
+    function isMaster() {
+      return request.auth != null && (
+        request.auth.token.email == 'irfandwi.hs@gmail.com' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Master'
+      );
+    }
+
+    // Fungsi untuk mengecek pemilik dokumen (Guru)
+    function isOwner(data) {
+      return request.auth != null && (
+        data.guruId == request.auth.uid || 
+        data.teacherId == request.auth.uid ||
+        isMaster()
+      );
+    }
+
+    // Koleksi Pengguna (Guru/Siswa)
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && (request.auth.uid == userId || isMaster());
+      allow update: if request.auth != null && (request.auth.uid == userId || isMaster());
+      allow delete: if isMaster();
+
+      // Sub-koleksi Riwayat (History)
+      match /history/{historyId} {
+        allow read: if request.auth != null && (request.auth.uid == userId || isMaster());
+        allow write: if request.auth != null && (request.auth.uid == userId || isMaster());
+      }
+    }
+    
+    // Koleksi Kuis
+    match /quizzes/{quizId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Guru' || 
+        isMaster()
+      );
+      allow update, delete: if isOwner(resource.data);
+    }
+
+    // Koleksi Ruangan (Rooms)
+    match /rooms/{roomId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Guru' || 
+        isMaster()
+      );
+      allow update: if request.auth != null; 
+      allow delete: if isOwner(resource.data);
+      
+      // Leaderboard di dalam ruangan
+      match /leaderboard/{siswaId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && (request.auth.uid == siswaId || isMaster());
+        allow delete: if isOwner(get(/databases/$(database)/documents/rooms/$(roomId)).data);
+      }
+    }
+
+    // Koleksi Materi (Materials)
+    match /materials/{materialId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Guru' || 
+        isMaster()
+      );
+      allow update, delete: if isOwner(resource.data);
+    }
+
+    // --- KOLEKSI TUGAS (ASSIGNMENTS) ---
+    match /assignments/{assignmentId} {
+      // Semua siswa dan guru yang login bisa membaca tugas
+      allow read: if request.auth != null;
+      
+      // Hanya Guru atau Master yang bisa membuat tugas
+      allow create: if request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Guru' || 
+        isMaster()
+      );
+      
+      // Hanya pemilik tugas (Guru pembuat) atau Master yang bisa mengubah/menghapus
+      allow update, delete: if isOwner(resource.data);
+
+      // Sub-koleksi Pengumpulan (Submissions)
+      match /submissions/{submissionId} {
+        // Guru pembuat tugas atau Master bisa membaca semua pengumpulan
+        // Siswa hanya bisa membaca pengumpulannya sendiri
+        allow read: if request.auth != null && (
+          isOwner(get(/databases/$(database)/documents/assignments/$(assignmentId)).data) ||
+          request.auth.uid == submissionId ||
+          isMaster()
+        );
+        
+        // Siswa bisa membuat/mengupdate pengumpulannya sendiri
+        // Master bisa melakukan apa saja
+        allow create, update: if request.auth != null && (
+          request.auth.uid == submissionId || 
+          isMaster()
+        );
+
+        // Hanya Master atau Guru pembuat tugas yang bisa menghapus pengumpulan
+        allow delete: if isMaster() || isOwner(get(/databases/$(database)/documents/assignments/$(assignmentId)).data);
+      }
+    }
+  }
+}

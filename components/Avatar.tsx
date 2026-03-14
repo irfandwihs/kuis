@@ -23,33 +23,25 @@ const CAPYBARA_POSITIONS = [
 ];
 
 // ==========================================
-// PENGATURAN URL AVATAR EKSTERNAL
+// PENGATURAN DICEBEAR STYLES
 // ==========================================
-// Masukkan 9 URL gambar berbeda di sini (format .webp sangat disarankan).
-// Pastikan urutannya sesuai dengan ekspresi yang diinginkan (0-8).
-const AVATAR_IMAGES = [
-  "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/capy1.webp", // Normal
-  "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/capy2.webp", // Senang
-  "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/capy3.webp", // Kaget
-  "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/capy4.webp", // Cool
-  "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/capy5.webp", // Misterius
-  "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/capy6.webp", // Semangat
-  "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/capy7.webp", // Santai
-  "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/capy8.webp", // Fokus
-  "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/capy9.webp", // Juara
-  "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/cat1.webp",
-  "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/cat2.webp",
-  "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/cat3.webp",
-  "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/cat4.webp",
-  "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/cat5.webp",
-  "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/cat6.webp",
-  "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/cat7.webp",
-  "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/cat8.webp",
-  "https://raw.githubusercontent.com/irfandwihs/kuis/master/public/cat9.webp",
+const DICEBEAR_STYLES = [
+  "adventurer",
+  "bottts",
+  "lorelei",
+  "fun-emoji",
+  "avataaars",
+  "personas",
+  "pixel-art",
+  "open-peeps",
+  "notionists",
+  "big-ears",
+  "big-smile",
+  "miniavs",
 ];
 
 export default function Avatar({
-  avatarString = "0",
+  avatarString = "adventurer:seed",
   size = "md",
   className = "",
 }: AvatarProps) {
@@ -62,10 +54,25 @@ export default function Avatar({
     setImageError(false);
   }
 
-  const safeAvatarString = avatarString || "0";
-  const avatarIdx = safeAvatarString.includes(":")
-    ? 0
-    : parseInt(safeAvatarString, 10);
+  const safeAvatarString = avatarString || "adventurer:seed";
+  
+  // Logic: if string contains ':', it's "style:seed". 
+  // If it's just a number (old data), we map it to a default style.
+  let style = "adventurer";
+  let seed = safeAvatarString;
+
+  if (safeAvatarString.includes(":")) {
+    const parts = safeAvatarString.split(":");
+    style = parts[0];
+    seed = parts[1];
+  } else {
+    // Fallback for old numeric IDs
+    const idx = parseInt(safeAvatarString, 10);
+    if (!isNaN(idx)) {
+      style = DICEBEAR_STYLES[idx % DICEBEAR_STYLES.length];
+      seed = `user-${idx}`;
+    }
+  }
 
   const sizeClasses = {
     sm: "w-8 h-8",
@@ -81,13 +88,7 @@ export default function Avatar({
     xl: "w-16 h-16",
   };
 
-  // Gunakan gambar dari array jika tersedia dan tidak error
-  const customImageUrl = AVATAR_IMAGES[avatarIdx];
-  const isUsingCustomImage = customImageUrl && !imageError;
-
-  const finalImageUrl = isUsingCustomImage
-    ? customImageUrl
-    : `https://api.dicebear.com/9.x/bottts-neutral/svg?seed=${safeAvatarString}&backgroundColor=ffdfbf`;
+  const finalImageUrl = `https://api.dicebear.com/9.x/${style}/svg?seed=${seed}&backgroundColor=ffdfbf,ffd5dc,d1d4f9,c0aede,b6e3f4`;
 
   return (
     <div
@@ -104,21 +105,6 @@ export default function Avatar({
             referrerPolicy="no-referrer"
             onError={() => setImageError(true)}
           />
-
-          {/* Preload all other images to prevent flickering when switching */}
-          <div className="hidden">
-            {AVATAR_IMAGES.map((url, i) => (
-              <div key={i} className="relative w-1 h-1">
-                <Image
-                  src={url}
-                  alt=""
-                  fill
-                  unoptimized
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-            ))}
-          </div>
         </div>
       ) : (
         <div className="w-full h-full flex items-center justify-center bg-brand-navy/5 z-10">
@@ -131,4 +117,4 @@ export default function Avatar({
   );
 }
 
-export { AVATAR_IMAGES };
+export { DICEBEAR_STYLES };

@@ -26,6 +26,7 @@ import {
   ChevronRight,
   Medal,
   Target,
+  RefreshCw,
 } from "lucide-react";
 import {
   collection,
@@ -37,6 +38,8 @@ import {
   limit,
   getCountFromServer,
   where,
+  setDoc,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import StudentOnboardingModal from "@/components/StudentOnboardingModal";
@@ -82,6 +85,9 @@ export default function SiswaDashboard() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [viewingAssignment, setViewingAssignment] = useState<Assignment | null>(null);
   const [viewingHistory, setViewingHistory] = useState<any>(null);
+  const [submissionContent, setSubmissionContent] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userSubmissions, setUserSubmissions] = useState<Record<string, any>>({});
 
   const ACHIEVEMENTS = [
     {
@@ -202,6 +208,17 @@ export default function SiswaDashboard() {
             (doc) => ({ id: doc.id, ...doc.data() }) as Assignment,
           );
           setAssignments(assignmentsData);
+
+          // 6. Fetch User Submissions
+          const submissions: Record<string, any> = {};
+          for (const asg of assignmentsData) {
+            const subRef = doc(db, "assignments", asg.id, "submissions", userData.uid);
+            const subSnap = await getDoc(subRef);
+            if (subSnap.exists()) {
+              submissions[asg.id] = subSnap.data();
+            }
+          }
+          setUserSubmissions(submissions);
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -209,7 +226,7 @@ export default function SiswaDashboard() {
     };
 
     fetchData();
-  }, [userData?.uid, userData?.xp, userData?.quizzesPlayed]);
+  }, [userData?.uid, userData?.xp, userData?.quizzesPlayed, userData?.studentClass]);
 
   const xp = userData?.xp || 0;
   const quizzesPlayed = userData?.quizzesPlayed || 0;
@@ -737,42 +754,54 @@ export default function SiswaDashboard() {
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-black text-brand-navy/40 uppercase tracking-widest mb-2 ml-1">
-                      Ekspresi
+                    <label className="block text-[10px] font-black text-brand-navy/40 uppercase tracking-widest mb-4 ml-1">
+                      Kustomisasi Avatar
                     </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { id: "0" },
-                        { id: "1" },
-                        { id: "2" },
-                        { id: "3" },
-                        { id: "4" },
-                        { id: "5" },
-                        { id: "6" },
-                        { id: "7" },
-                        { id: "8" },
-                        { id: "9" },
-                        { id: "10" },
-                        { id: "11" },
-                        { id: "12" },
-                        { id: "13" },
-                        { id: "14" },
-                        { id: "15" },
-                        { id: "16" },
-                        { id: "17" },
-                      ].map((exp) => (
-                        <button
-                          key={exp.id}
-                          onClick={() => updateProfile({ avatar: exp.id })}
-                          className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center gap-1 ${
-                            userData.avatar === exp.id
-                              ? "border-brand-orange bg-brand-orange/5 text-brand-orange"
-                              : "border-brand-navy/5 bg-brand-cream/30 text-brand-navy/40 hover:border-brand-orange/30"
-                          }`}
-                        >
-                          <Avatar avatarString={exp.id} size="sm" />
-                        </button>
-                      ))}
+                    
+                    <div className="bg-brand-cream/30 p-6 rounded-3xl border border-brand-navy/5 space-y-6">
+                      <div className="flex flex-col sm:flex-row items-center gap-6">
+                        <Avatar avatarString={userData.avatar} size="lg" className="border-4 border-white shadow-xl" />
+                        <div className="flex-1 space-y-3 w-full">
+                          <button
+                            onClick={() => {
+                              const currentStyle = userData.avatar?.split(":")[0] || "adventurer";
+                              const newSeed = Math.random().toString(36).substring(7);
+                              updateProfile({ avatar: `${currentStyle}:${newSeed}` });
+                            }}
+                            className="w-full flex items-center justify-center gap-2 bg-brand-navy text-white py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-brand-black transition-all active:scale-95"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                            Acak Karakter
+                          </button>
+                          <p className="text-[10px] text-brand-navy/40 font-medium text-center sm:text-left">
+                            Klik tombol di atas untuk mendapatkan tampilan baru dengan gaya yang sama.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <span className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
+                          Pilih Gaya Seni
+                        </span>
+                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                          {DICEBEAR_STYLES.map((style) => (
+                            <button
+                              key={style}
+                              onClick={() => {
+                                const currentSeed = userData.avatar?.split(":")[1] || "seed";
+                                updateProfile({ avatar: `${style}:${currentSeed}` });
+                              }}
+                              className={`p-1 rounded-xl border-2 transition-all ${
+                                userData.avatar?.startsWith(style)
+                                  ? "border-brand-orange bg-brand-orange/5"
+                                  : "border-transparent bg-white hover:border-brand-orange/30"
+                              }`}
+                            >
+                              <Avatar avatarString={`${style}:preview`} size="sm" className="w-full h-full" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -1027,9 +1056,81 @@ export default function SiswaDashboard() {
 
               <div className="flex-1 overflow-y-auto p-6 md:p-8">
                 <div 
-                  className="prose prose-sm md:prose-base max-w-none text-brand-navy/80"
+                  className="prose prose-sm md:prose-base max-w-none text-brand-navy/80 mb-8"
                   dangerouslySetInnerHTML={{ __html: viewingAssignment.content }}
                 />
+
+                <div className="mt-8 pt-8 border-t border-brand-navy/5">
+                  <h3 className="text-lg font-black text-brand-navy mb-4 flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-brand-orange" />
+                    Pengumpulan Tugas
+                  </h3>
+
+                  {userSubmissions[viewingAssignment.id] ? (
+                    <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-3xl">
+                      <div className="flex items-center gap-2 text-emerald-600 font-black text-xs uppercase tracking-widest mb-2">
+                        <CheckCircle className="w-4 h-4" />
+                        Sudah Dikumpulkan
+                      </div>
+                      <p className="text-sm text-emerald-800 font-medium mb-4">
+                        {userSubmissions[viewingAssignment.id].content}
+                      </p>
+                      <div className="text-[10px] text-emerald-600/60 font-bold uppercase tracking-widest">
+                        Dikumpulkan pada: {userSubmissions[viewingAssignment.id].submittedAt?.toDate().toLocaleString("id-ID")}
+                      </div>
+                      {userSubmissions[viewingAssignment.id].grade !== undefined && (
+                        <div className="mt-4 pt-4 border-t border-emerald-100">
+                          <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Nilai:</div>
+                          <div className="text-3xl font-black text-emerald-700">{userSubmissions[viewingAssignment.id].grade}</div>
+                          {userSubmissions[viewingAssignment.id].feedback && (
+                            <div className="mt-2 text-xs text-emerald-800 italic">
+                              &quot;{userSubmissions[viewingAssignment.id].feedback}&quot;
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <textarea
+                        value={submissionContent}
+                        onChange={(e) => setSubmissionContent(e.target.value)}
+                        placeholder="Tuliskan jawaban atau link tugas kamu di sini..."
+                        className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange outline-none font-medium text-brand-navy transition-all min-h-[150px]"
+                      />
+                      <button
+                        onClick={async () => {
+                          if (!submissionContent.trim() || isSubmitting) return;
+                          setIsSubmitting(true);
+                          try {
+                            const subRef = doc(db, "assignments", viewingAssignment.id, "submissions", userData.uid);
+                            const submissionData = {
+                              studentId: userData.uid,
+                              studentName: userData.displayName,
+                              studentClass: userData.studentClass,
+                              content: submissionContent,
+                              submittedAt: new Date(),
+                              status: "submitted"
+                            };
+                            await setDoc(subRef, submissionData);
+                            setUserSubmissions(prev => ({ ...prev, [viewingAssignment.id]: submissionData }));
+                            setSubmissionContent("");
+                            alert("Tugas berhasil dikumpulkan!");
+                          } catch (err) {
+                            console.error(err);
+                            alert("Gagal mengumpulkan tugas.");
+                          } finally {
+                            setIsSubmitting(false);
+                          }
+                        }}
+                        disabled={!submissionContent.trim() || isSubmitting}
+                        className="w-full bg-brand-orange text-white font-black py-4 rounded-2xl hover:bg-brand-orange/90 transition-all shadow-lg shadow-brand-orange/20 disabled:opacity-50"
+                      >
+                        {isSubmitting ? "Mengirim..." : "Kumpulkan Tugas"}
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </motion.div>
           </div>

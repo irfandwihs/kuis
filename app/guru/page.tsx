@@ -12,6 +12,7 @@ import {
   deleteDoc,
   doc,
   limit,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
@@ -36,6 +37,7 @@ import {
   PieChart as PieChartIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "motion/react";
 import { GoogleGenAI, Type } from "@google/genai";
 import RichTextEditor from "@/components/RichTextEditor";
 import Avatar from "@/components/Avatar";
@@ -193,6 +195,10 @@ export default function GuruDashboard() {
 
   // Assignment State
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [viewingSubmissions, setViewingSubmissions] = useState<Assignment | null>(null);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
+  const [gradingInfo, setGradingInfo] = useState<{ id: string, grade: string, feedback: string } | null>(null);
   const [isCreatingAssignment, setIsCreatingAssignment] = useState(false);
   const [assignmentTitle, setAssignmentTitle] = useState("");
   const [assignmentDesc, setAssignmentDesc] = useState("");
@@ -430,7 +436,7 @@ export default function GuruDashboard() {
       }
     };
     loadData();
-  }, [userData, fetchQuizzes, fetchRooms, fetchTopStudents, fetchMaterials]);
+  }, [userData, fetchQuizzes, fetchRooms, fetchTopStudents, fetchMaterials, fetchAssignments]);
 
   const fetchRoomLeaderboard = async (roomId: string) => {
     setIsFetchingRoomLeaderboard(true);
@@ -733,6 +739,38 @@ export default function GuruDashboard() {
       alert(`Gagal membuat materi: ${error.message}`);
     } finally {
       setIsUploadingMaterial(false);
+    }
+  };
+
+  const fetchSubmissions = async (assignmentId: string) => {
+    setIsLoadingSubmissions(true);
+    try {
+      const q = query(collection(db, "assignments", assignmentId, "submissions"), orderBy("submittedAt", "desc"));
+      const snapshot = await getDocs(q);
+      setSubmissions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoadingSubmissions(false);
+    }
+  };
+
+  const handleGrade = async () => {
+    if (!gradingInfo || !viewingSubmissions) return;
+    try {
+      const subRef = doc(db, "assignments", viewingSubmissions.id, "submissions", gradingInfo.id);
+      await updateDoc(subRef, {
+        grade: parseInt(gradingInfo.grade),
+        feedback: gradingInfo.feedback,
+        status: "graded",
+        gradedAt: new Date()
+      });
+      setSubmissions(prev => prev.map(s => s.id === gradingInfo.id ? { ...s, grade: parseInt(gradingInfo.grade), feedback: gradingInfo.feedback, status: "graded" } : s));
+      setGradingInfo(null);
+      alert("Nilai berhasil disimpan!");
+    } catch (err) {
+      console.error(err);
+      alert("Gagal menyimpan nilai.");
     }
   };
 
@@ -1722,16 +1760,28 @@ export default function GuruDashboard() {
                         >
                           Lihat Detail
                         </button>
-                        <button
-                          onClick={() => deleteAssignment(asg.id)}
-                          className={`px-4 rounded-2xl transition-all flex items-center justify-center ${
-                            deletingAssignmentId === asg.id
-                              ? "bg-red-500 text-white"
-                              : "bg-red-50 text-red-500 hover:bg-red-100"
-                          }`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setViewingSubmissions(asg);
+                              fetchSubmissions(asg.id);
+                            }}
+                            className="p-2 text-brand-navy/40 hover:text-brand-orange transition-colors"
+                            title="Lihat Pengumpulan"
+                          >
+                            <Users className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => deleteAssignment(asg.id)}
+                            className={`px-4 rounded-2xl transition-all flex items-center justify-center ${
+                              deletingAssignmentId === asg.id
+                                ? "bg-red-500 text-white"
+                                : "bg-red-50 text-red-500 hover:bg-red-100"
+                            }`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -2529,7 +2579,139 @@ export default function GuruDashboard() {
         </div>
       )}
 
-      {/* Create Material Modal */}
+      {/* Submissions Modal */}
+      <AnimatePresence>
+        {viewingSubmissions && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-navy/20 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-[40px] shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
+            >
+              <div className="p-8 border-b border-brand-navy/5 flex justify-between items-center bg-brand-cream/30">
+                <div>
+                  <h2 className="text-2xl font-black text-brand-navy">Pengumpulan Tugas</h2>
+                  <p className="text-sm text-brand-navy/60 font-bold uppercase tracking-widest mt-1">
+                    {viewingSubmissions.title}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setViewingSubmissions(null)}
+                  className="p-3 hover:bg-white rounded-2xl transition-colors text-brand-navy/40 hover:text-brand-navy shadow-sm"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8">
+                {isLoadingSubmissions ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-4">
+                    <div className="w-12 h-12 border-4 border-brand-orange border-t-transparent rounded-full animate-spin" />
+                    <p className="text-brand-navy/40 font-black uppercase tracking-widest text-xs">Memuat pengumpulan...</p>
+                  </div>
+                ) : submissions.length === 0 ? (
+                  <div className="text-center py-20">
+                    <div className="w-20 h-20 bg-brand-cream rounded-full flex items-center justify-center mx-auto mb-6">
+                      <Users className="w-10 h-10 text-brand-navy/20" />
+                    </div>
+                    <h3 className="text-xl font-black text-brand-navy mb-2">Belum ada pengumpulan</h3>
+                    <p className="text-brand-navy/60 font-medium">Siswa belum ada yang mengumpulkan tugas ini.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {submissions.map((sub) => (
+                      <div key={sub.id} className="p-6 bg-brand-cream/30 border border-brand-navy/5 rounded-3xl hover:border-brand-orange/20 transition-all">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                          <div>
+                            <div className="text-lg font-black text-brand-navy">{sub.studentName}</div>
+                            <div className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest">
+                              Kelas: {sub.studentClass} • Dikumpulkan: {sub.submittedAt?.toDate().toLocaleString("id-ID")}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {sub.grade !== undefined ? (
+                              <div className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl font-black text-sm border border-emerald-100">
+                                Nilai: {sub.grade}
+                              </div>
+                            ) : (
+                              <div className="px-4 py-2 bg-amber-50 text-amber-600 rounded-xl font-black text-sm border border-amber-100">
+                                Belum Dinilai
+                              </div>
+                            )}
+                            <button
+                              onClick={() => setGradingInfo({ id: sub.id, grade: sub.grade?.toString() || "", feedback: sub.feedback || "" })}
+                              className="px-4 py-2 bg-brand-navy text-white rounded-xl font-black text-sm hover:bg-brand-navy/90 transition-all"
+                            >
+                              {sub.grade !== undefined ? "Ubah Nilai" : "Beri Nilai"}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-white/50 rounded-2xl text-sm text-brand-navy/80 font-medium border border-brand-navy/5">
+                          {sub.content}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Grading Modal */}
+      <AnimatePresence>
+        {gradingInfo && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-brand-navy/40 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[40px] shadow-2xl w-full max-w-md p-8"
+            >
+              <h3 className="text-2xl font-black text-brand-navy mb-6">Beri Nilai</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest mb-2 block">Nilai (0-100)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={gradingInfo.grade}
+                    onChange={(e) => setGradingInfo({ ...gradingInfo, grade: e.target.value })}
+                    className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange outline-none font-black text-xl text-brand-navy transition-all"
+                    placeholder="Contoh: 95"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest mb-2 block">Umpan Balik (Opsional)</label>
+                  <textarea
+                    value={gradingInfo.feedback}
+                    onChange={(e) => setGradingInfo({ ...gradingInfo, feedback: e.target.value })}
+                    className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange outline-none font-medium text-brand-navy transition-all min-h-[100px]"
+                    placeholder="Bagus sekali! Pertahankan prestasimu."
+                  />
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={() => setGradingInfo(null)}
+                    className="flex-1 py-4 font-black text-brand-navy/40 uppercase tracking-widest text-xs hover:text-brand-navy transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    onClick={handleGrade}
+                    className="flex-1 bg-brand-orange text-white font-black py-4 rounded-2xl hover:bg-brand-orange/90 transition-all shadow-lg shadow-brand-orange/20"
+                  >
+                    Simpan Nilai
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       {isCreatingMaterial && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white w-full max-w-2xl max-h-[90vh] rounded-[40px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
