@@ -9,10 +9,14 @@ import Avatar, { DICEBEAR_STYLES } from "./Avatar";
 export default function StudentOnboardingModal() {
   const { userData, updateProfile } = useAuth();
   const [name, setName] = useState(userData?.displayName || "");
-  const [studentClass, setStudentClass] = useState(userData?.studentClass || "");
-  const [studentAbsen, setStudentAbsen] = useState(userData?.studentAbsen || "");
+  const [studentClass, setStudentClass] = useState(
+    userData?.studentClass || "",
+  );
+  const [studentAbsen, setStudentAbsen] = useState(
+    userData?.studentAbsen || "",
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // Character Creator State
   const [selectedStyle, setSelectedStyle] = useState(DICEBEAR_STYLES[0]);
   const [seed, setSeed] = useState(Math.random().toString(36).substring(7));
@@ -36,7 +40,7 @@ export default function StudentOnboardingModal() {
         displayName: name,
         avatar: avatarString,
         studentClass: studentClass,
-        studentAbsen: studentAbsen
+        studentAbsen: studentAbsen,
       });
     } catch (error) {
       console.error("Error updating profile:", error);
@@ -46,9 +50,30 @@ export default function StudentOnboardingModal() {
   };
 
   const classOptions = [
-    "7A", "7B", "7C", "7D", "7E", "7F", "7G", "7H",
-    "8A", "8B", "8C", "8D", "8E", "8F", "8G", "8H",
-    "9A", "9B", "9C", "9D", "9E", "9F", "9G", "9H"
+    "7A",
+    "7B",
+    "7C",
+    "7D",
+    "7E",
+    "7F",
+    "7G",
+    "7H",
+    "8A",
+    "8B",
+    "8C",
+    "8D",
+    "8E",
+    "8F",
+    "8G",
+    "8H",
+    "9A",
+    "9B",
+    "9C",
+    "9D",
+    "9E",
+    "9F",
+    "9G",
+    "9H",
   ];
 
   const absenOptions = Array.from({ length: 32 }, (_, i) => (i + 1).toString());
@@ -64,18 +89,30 @@ export default function StudentOnboardingModal() {
           {/* Left Side: Preview */}
           <div className="bg-brand-navy p-6 md:p-10 md:w-2/5 flex flex-col items-center justify-center text-center relative shrink-0">
             <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-              <div className="absolute top-4 left-4 rotate-12"><Sparkles className="w-8 h-8 text-white" /></div>
-              <div className="absolute bottom-4 right-4 -rotate-12"><GraduationCap className="w-8 h-8 text-white" /></div>
+              <div className="absolute top-4 left-4 rotate-12">
+                <Sparkles className="w-8 h-8 text-white" />
+              </div>
+              <div className="absolute bottom-4 right-4 -rotate-12">
+                <GraduationCap className="w-8 h-8 text-white" />
+              </div>
             </div>
-            
+
             <div className="relative mb-6 md:mb-8">
               <div className="absolute -inset-6 bg-brand-orange/20 rounded-full blur-3xl animate-pulse" />
-              <Avatar avatarString={avatarString} size="xl" className="relative z-10 border-4 border-white shadow-2xl scale-90 md:scale-110" />
+              <Avatar
+                avatarString={avatarString}
+                size="xl"
+                className="relative z-10 border-4 border-white shadow-2xl scale-90 md:scale-110"
+              />
             </div>
-            
-            <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-3">Avatar Builder</h2>
-            <p className="text-white/60 text-xs md:text-sm font-medium mb-6">Buat karakter unikmu sendiri!</p>
-            
+
+            <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-3">
+              Avatar Builder
+            </h2>
+            <p className="text-white/60 text-xs md:text-sm font-medium mb-6">
+              Buat karakter unikmu sendiri!
+            </p>
+
             <button
               type="button"
               onClick={randomizeSeed}
@@ -119,9 +156,13 @@ export default function StudentOnboardingModal() {
                       onChange={(e) => setStudentClass(e.target.value)}
                       className="w-full pl-12 pr-4 py-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none text-brand-navy font-bold transition-all appearance-none cursor-pointer"
                     >
-                      <option value="" disabled>Pilih Kelas</option>
-                      {classOptions.map(cls => (
-                        <option key={cls} value={cls}>{cls}</option>
+                      <option value="" disabled>
+                        Pilih Kelas
+                      </option>
+                      {classOptions.map((cls) => (
+                        <option key={cls} value={cls}>
+                          {cls}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -139,9 +180,13 @@ export default function StudentOnboardingModal() {
                       onChange={(e) => setStudentAbsen(e.target.value)}
                       className="w-full pl-12 pr-4 py-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none text-brand-navy font-bold transition-all appearance-none cursor-pointer"
                     >
-                      <option value="" disabled>Pilih No Absen</option>
-                      {absenOptions.map(num => (
-                        <option key={num} value={num}>{num}</option>
+                      <option value="" disabled>
+                        Pilih No Absen
+                      </option>
+                      {absenOptions.map((num) => (
+                        <option key={num} value={num}>
+                          {num}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -153,24 +198,26 @@ export default function StudentOnboardingModal() {
                 <label className="block text-[10px] font-black text-brand-navy/40 uppercase tracking-widest mb-4 ml-1">
                   Pilih Gaya Seni
                 </label>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                   {DICEBEAR_STYLES.map((style) => (
                     <button
                       key={style}
                       type="button"
                       onClick={() => setSelectedStyle(style)}
-                      className={`relative aspect-square rounded-2xl overflow-hidden border-4 transition-all ${
-                        selectedStyle === style 
-                          ? "border-brand-orange shadow-lg shadow-brand-orange/20 scale-105 z-10" 
+                      className={`relative aspect-square rounded-2xl overflow-hidden border-4 transition-all flex items-center justify-center ${
+                        selectedStyle === style
+                          ? "border-brand-orange shadow-lg shadow-brand-orange/20 scale-105 z-10"
                           : "border-transparent bg-brand-cream/30 hover:border-brand-orange/30 hover:scale-105"
                       }`}
                     >
-                      <Avatar 
+                      <Avatar
                         avatarString={`${style}:preview`}
-                        size="sm"
-                        className="w-full h-full"
+                        size="md"
+                        className="w-4/5 h-4/5"
                       />
-                      <div className={`absolute inset-0 bg-brand-orange/10 transition-opacity ${selectedStyle === style ? "opacity-100" : "opacity-0"}`} />
+                      <div
+                        className={`absolute inset-0 bg-brand-orange/10 transition-opacity ${selectedStyle === style ? "opacity-100" : "opacity-0"}`}
+                      />
                     </button>
                   ))}
                 </div>

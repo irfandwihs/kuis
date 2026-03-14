@@ -571,7 +571,7 @@ export default function SiswaDashboard() {
                     </div>
                   </div>
                   <p className="mt-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest">
-                    Ganti avatar di Toko
+                    
                   </p>
                 </div>
 

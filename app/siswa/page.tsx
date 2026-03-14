@@ -719,9 +719,7 @@ export default function SiswaDashboard() {
                       <ShoppingBag className="w-8 h-8 text-white" />
                     </div>
                   </div>
-                  <p className="mt-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest">
-                    Ganti avatar di Toko
-                  </p>
+                  <p className="mt-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest"></p>
                 </div>
 
                 <div className="space-y-4">
@@ -820,7 +818,7 @@ export default function SiswaDashboard() {
                         <span className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
                           Pilih Gaya Seni
                         </span>
-                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                           {DICEBEAR_STYLES.map((style) => (
                             <button
                               key={style}
@@ -837,7 +835,7 @@ export default function SiswaDashboard() {
                                   avatar: `${style}:${currentSeed}`,
                                 });
                               }}
-                              className={`p-1 rounded-xl border-2 transition-all ${
+                              className={`p-3 rounded-xl border-2 transition-all h-24 flex items-center justify-center ${
                                 userData.avatar?.startsWith(style + ":")
                                   ? "border-brand-orange bg-brand-orange/5"
                                   : "border-transparent bg-white hover:border-brand-orange/30"
@@ -845,7 +843,7 @@ export default function SiswaDashboard() {
                             >
                               <Avatar
                                 avatarString={`${style}:preview`}
-                                size="sm"
+                                size="md"
                                 className="w-full h-full"
                               />
                             </button>
