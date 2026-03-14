@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { ArrowLeft, Flag, Trophy, Users } from "lucide-react";
+import { ArrowLeft, Flag, Trophy, Users, AlertTriangle } from "lucide-react";
 import { motion } from "motion/react";
 import Avatar from "@/components/Avatar";
 
@@ -142,6 +142,11 @@ export default function RaceMode() {
                             <div className="block md:hidden">
                               <Avatar avatarString={racer.avatar} size="sm" className={`border-2 ${isFinished ? 'border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)]' : 'border-white/20'} bg-brand-navy`} />
                             </div>
+                            {racer.cheatCount > 0 && (
+                              <div className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full border border-white/20 shadow-[0_0_10px_rgba(239,68,68,0.5)]" title={`${racer.cheatCount} Pelanggaran: ${racer.lastCheatMessage}`}>
+                                <AlertTriangle className="w-3 h-3 md:w-4 md:h-4" />
+                              </div>
+                            )}
                           </div>
                           
                           {/* Name Tag */}

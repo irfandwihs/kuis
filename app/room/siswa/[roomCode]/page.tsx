@@ -14,6 +14,7 @@ import {
   increment,
   addDoc,
   getCountFromServer,
+  arrayUnion,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -100,7 +101,7 @@ export default function SiswaRoom() {
   useEffect(() => {
     if (!room || room.status !== "playing" || submitted) return;
 
-    const triggerCheatAlarm = (message: string) => {
+    const triggerCheatAlarm = async (message: string) => {
       setIsCheating(true);
       setCheatMessage(message);
       setCheatCount((prev) => prev + 1);
@@ -108,6 +109,28 @@ export default function SiswaRoom() {
       // Vibrate
       if (navigator.vibrate) {
         navigator.vibrate([500, 200, 500, 200, 500]);
+      }
+
+      // Update Firestore
+      if (userData?.uid && room?.id) {
+        try {
+          await updateDoc(
+            doc(db, "rooms", room.id, "leaderboard", userData.uid),
+            {
+              cheatCount: increment(1),
+              isCheating: true,
+              lastCheatMessage: message,
+              lastCheatTime: new Date(),
+              activityLogs: arrayUnion({
+                type: "cheat",
+                message: `Terdeteksi Curang: ${message}`,
+                timestamp: new Date().toISOString()
+              })
+            }
+          );
+        } catch (e) {
+          console.error("Failed to update cheat count", e);
+        }
       }
 
       // Play alarm sound
@@ -302,6 +325,11 @@ export default function SiswaRoom() {
                     totalQuestions: shuffled.length,
                     status: "playing",
                     lastUpdate: new Date(),
+                    activityLogs: arrayUnion({
+                      type: "start",
+                      message: "Memulai Kuis",
+                      timestamp: new Date().toISOString()
+                    }),
                     sessionData: {
                       questions: shuffled,
                       answers: {},
@@ -551,6 +579,11 @@ export default function SiswaRoom() {
         score: calculatedScore,
         status: "finished",
         submittedAt: new Date(),
+        activityLogs: arrayUnion({
+          type: "finish",
+          message: "Menyelesaikan Kuis",
+          timestamp: new Date().toISOString()
+        })
       },
       { merge: true },
     );
@@ -585,7 +618,7 @@ export default function SiswaRoom() {
     });
   };
 
-  const handleResume = () => {
+  const handleResume = async () => {
     if (incompleteSession) {
       setQuestions(incompleteSession.questions);
       setAnswers(incompleteSession.answers || {});
@@ -599,6 +632,20 @@ export default function SiswaRoom() {
       setPhoenixFeatherUsed(incompleteSession.phoenixFeatherUsed || 0);
       setIsGoldenAppleActive(incompleteSession.isGoldenAppleActive || false);
       setRemovedOptions(incompleteSession.removedOptions || []);
+      
+      if (room?.id && userData?.uid) {
+        try {
+          await updateDoc(doc(db, "rooms", room.id, "leaderboard", userData.uid), {
+            activityLogs: arrayUnion({
+              type: "resume",
+              message: "Melanjutkan Kuis",
+              timestamp: new Date().toISOString()
+            })
+          });
+        } catch (e) {
+          console.error("Failed to update resume log", e);
+        }
+      }
     }
     setShowResumePrompt(false);
   };
@@ -630,6 +677,11 @@ export default function SiswaRoom() {
         score: 0,
         status: "playing",
         lastUpdate: new Date(),
+        activityLogs: arrayUnion({
+          type: "restart",
+          message: "Mengulang Kuis",
+          timestamp: new Date().toISOString()
+        }),
         sessionData: {
           questions: shuffled,
           answers: {},
@@ -1106,7 +1158,12 @@ export default function SiswaRoom() {
   ];
 
   return (
-    <div className="min-h-screen bg-brand-cream flex flex-col items-center overflow-hidden select-none">
+    <div 
+      className="min-h-screen bg-brand-cream flex flex-col items-center overflow-hidden select-none"
+      onCopy={(e) => e.preventDefault()}
+      onContextMenu={(e) => e.preventDefault()}
+      style={{ WebkitTouchCallout: 'none' }}
+    >
       <div className="w-full max-w-md md:max-w-2xl px-4 py-6 md:py-10">
         {/* Item Bar */}
         <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">

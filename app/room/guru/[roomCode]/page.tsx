@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { collection, query, where, onSnapshot, doc, updateDoc, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { Users, Play, Square, ArrowLeft, CheckCircle2, Circle, Clock, FileText, Download, X, Flag } from "lucide-react";
+import { Users, Play, Square, ArrowLeft, CheckCircle2, Circle, Clock, FileText, Download, X, Flag, AlertTriangle, Activity, RotateCcw, CheckCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import Avatar from "@/components/Avatar";
 
@@ -16,6 +16,7 @@ export default function GuruRoom() {
   const [room, setRoom] = useState<any>(null);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [showReport, setShowReport] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<any>(null);
 
   useEffect(() => {
     if (!roomCode) return;
@@ -49,7 +50,7 @@ export default function GuruRoom() {
   const downloadCSV = () => {
     if (leaderboard.length === 0) return;
 
-    const headers = ["Peringkat", "Nama Siswa", "Kelas", "No Absen", "Skor (XP)", "Status"];
+    const headers = ["Peringkat", "Nama Siswa", "Kelas", "No Absen", "Skor (XP)", "Status", "Jumlah Pelanggaran", "Pesan Pelanggaran Terakhir"];
     const csvContent = [
       headers.join(","),
       ...leaderboard.map((entry, index) => {
@@ -59,7 +60,9 @@ export default function GuruRoom() {
           `"${entry.studentClass || "-"}"`,
           `"${entry.studentAbsen || "-"}"`,
           entry.score,
-          entry.status === "finished" ? "Selesai" : "Belum Selesai"
+          entry.status === "finished" ? "Selesai" : "Belum Selesai",
+          entry.cheatCount || 0,
+          `"${entry.lastCheatMessage || "-"}"`
         ].join(",");
       })
     ].join("\n");
@@ -175,7 +178,15 @@ export default function GuruRoom() {
                           )}
                         </div>
                         <div>
-                          <h3 className="font-black text-brand-navy text-base leading-none mb-1">{entry.siswaName}</h3>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-black text-brand-navy text-base leading-none">{entry.siswaName}</h3>
+                            {entry.cheatCount > 0 && (
+                              <div className="flex items-center gap-1 bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest" title={entry.lastCheatMessage}>
+                                <AlertTriangle className="w-3 h-3" />
+                                {entry.cheatCount} Pelanggaran
+                              </div>
+                            )}
+                          </div>
                           <p className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest">
                             {entry.studentClass} • No Absen {entry.studentAbsen || "-"} • {entry.status === "finished" ? "Selesai" : `Sedang Mengerjakan Soal ke-${Math.min((entry.progress || 0) + 1, entry.totalQuestions || 1)}`}
                           </p>
@@ -209,6 +220,14 @@ export default function GuruRoom() {
                         ))}
                       </div>
                     </div>
+                    
+                    <button
+                      onClick={() => setSelectedStudent(entry)}
+                      className="mt-4 w-full bg-white hover:bg-brand-navy/5 border border-brand-navy/10 text-brand-navy font-black text-xs py-3 rounded-2xl uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Lihat Aktivitas
+                    </button>
                   </div>
                 );
               })}
@@ -265,13 +284,14 @@ export default function GuruRoom() {
                           <th className="p-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest">Kelas</th>
                           <th className="p-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest text-center">No Absen</th>
                           <th className="p-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest text-right">Skor (XP)</th>
+                          <th className="p-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest text-center">Pelanggaran</th>
                           <th className="p-4 text-[10px] font-black text-brand-navy/40 uppercase tracking-widest text-center">Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {leaderboard.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="p-8 text-center text-brand-navy/40 text-sm font-bold">Belum ada data siswa.</td>
+                            <td colSpan={7} className="p-8 text-center text-brand-navy/40 text-sm font-bold">Belum ada data siswa.</td>
                           </tr>
                         ) : (
                           leaderboard.map((entry, idx) => (
@@ -296,6 +316,16 @@ export default function GuruRoom() {
                               <td className="p-4 text-sm font-bold text-brand-navy/60 text-center">{entry.studentAbsen || "-"}</td>
                               <td className="p-4 text-right font-black text-brand-orange">{entry.score}</td>
                               <td className="p-4 text-center">
+                                {entry.cheatCount > 0 ? (
+                                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-50 text-red-600" title={entry.lastCheatMessage}>
+                                    <AlertTriangle className="w-3 h-3" />
+                                    {entry.cheatCount}
+                                  </span>
+                                ) : (
+                                  <span className="text-brand-navy/20 font-bold">-</span>
+                                )}
+                              </td>
+                              <td className="p-4 text-center">
                                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
                                   entry.status === "finished" ? "bg-emerald-50 text-emerald-600" : "bg-brand-orange/10 text-brand-orange"
                                 }`}>
@@ -309,6 +339,171 @@ export default function GuruRoom() {
                       </tbody>
                     </table>
                   </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Activity Modal */}
+      <AnimatePresence>
+        {selectedStudent && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-sm animate-in fade-in">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[48px] shadow-2xl flex flex-col overflow-hidden"
+            >
+              <div className="p-8 border-b border-brand-navy/5 flex items-center justify-between bg-brand-cream/20">
+                <div className="flex items-center gap-4">
+                  <Avatar avatarString={selectedStudent.avatar} size="lg" />
+                  <div>
+                    <h2 className="text-2xl font-black text-brand-navy tracking-tight">{selectedStudent.siswaName}</h2>
+                    <p className="text-xs font-bold text-brand-navy/40 uppercase tracking-widest">
+                      Kelas {selectedStudent.studentClass || "-"} • No Absen {selectedStudent.studentAbsen || "-"}
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedStudent(null)}
+                  className="p-3 bg-white rounded-2xl text-brand-navy/20 hover:text-red-500 transition-all shadow-sm"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-brand-cream/10">
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                  <div className="bg-white p-4 rounded-3xl border border-brand-navy/5 shadow-sm text-center">
+                    <div className="text-brand-navy/40 font-black text-[10px] uppercase tracking-widest mb-1">Skor (XP)</div>
+                    <div className="text-2xl font-black text-brand-orange">{selectedStudent.score}</div>
+                  </div>
+                  <div className="bg-white p-4 rounded-3xl border border-brand-navy/5 shadow-sm text-center">
+                    <div className="text-brand-navy/40 font-black text-[10px] uppercase tracking-widest mb-1">Progress</div>
+                    <div className="text-2xl font-black text-brand-navy">{selectedStudent.progress} / {selectedStudent.totalQuestions}</div>
+                  </div>
+                  <div className="bg-white p-4 rounded-3xl border border-brand-navy/5 shadow-sm text-center">
+                    <div className="text-brand-navy/40 font-black text-[10px] uppercase tracking-widest mb-1">Status</div>
+                    <div className={`text-sm font-black mt-2 ${selectedStudent.status === "finished" ? "text-emerald-500" : "text-brand-orange"}`}>
+                      {selectedStudent.status === "finished" ? "SELESAI" : "AKTIF"}
+                    </div>
+                  </div>
+                  <div className="bg-white p-4 rounded-3xl border border-brand-navy/5 shadow-sm text-center">
+                    <div className="text-brand-navy/40 font-black text-[10px] uppercase tracking-widest mb-1">Pelanggaran</div>
+                    <div className={`text-2xl font-black ${selectedStudent.cheatCount > 0 ? "text-red-500" : "text-emerald-500"}`}>
+                      {selectedStudent.cheatCount || 0}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cheat Logs */}
+                {selectedStudent.cheatCount > 0 && (
+                  <div className="mb-8 bg-red-50 p-6 rounded-3xl border border-red-100">
+                    <h3 className="text-red-600 font-black text-sm uppercase tracking-widest mb-2 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      Catatan Pelanggaran
+                    </h3>
+                    <p className="text-red-800/80 text-sm font-medium">
+                      Terakhir: {selectedStudent.lastCheatMessage}
+                    </p>
+                  </div>
+                )}
+
+                {/* Activity Logs */}
+                {selectedStudent.activityLogs && selectedStudent.activityLogs.length > 0 && (
+                  <div className="mb-8">
+                    <h3 className="text-brand-navy font-black text-lg mb-4 flex items-center gap-2">
+                      <Activity className="w-5 h-5 text-brand-orange" />
+                      Aktivitas & Percobaan
+                    </h3>
+                    <div className="space-y-3">
+                      {selectedStudent.activityLogs.map((log: any, idx: number) => {
+                        let Icon = Play;
+                        let iconBg = "bg-blue-100 text-blue-500";
+                        if (log.type === "restart" || log.type === "resume") {
+                          Icon = RotateCcw;
+                          iconBg = "bg-purple-100 text-purple-500";
+                        } else if (log.type === "finish") {
+                          Icon = CheckCircle;
+                          iconBg = "bg-emerald-100 text-emerald-500";
+                        } else if (log.type === "cheat") {
+                          Icon = AlertTriangle;
+                          iconBg = "bg-red-100 text-red-500";
+                        }
+
+                        return (
+                          <div key={idx} className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-brand-navy/5 shadow-sm">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${iconBg}`}>
+                              <Icon className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-brand-navy">{log.message}</p>
+                              <p className="text-xs text-brand-navy/40 font-medium">
+                                {new Date(log.timestamp).toLocaleString("id-ID", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  second: "2-digit"
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Questions Breakdown */}
+                <h3 className="text-brand-navy font-black text-lg mb-4">Detail Jawaban</h3>
+                <div className="space-y-4">
+                  {selectedStudent.sessionData?.questions ? (
+                    selectedStudent.sessionData.questions.map((q: any, idx: number) => {
+                      const answerIdx = selectedStudent.sessionData.answers?.[idx];
+                      const isAnswered = answerIdx !== undefined;
+                      const isCorrect = isAnswered && answerIdx === q.correctAnswerIndex;
+
+                      return (
+                        <div key={idx} className={`p-5 rounded-3xl border ${isAnswered ? (isCorrect ? "bg-emerald-50 border-emerald-100" : "bg-red-50 border-red-100") : "bg-white border-brand-navy/5"}`}>
+                          <div className="flex items-start gap-4">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-black text-xs ${isAnswered ? (isCorrect ? "bg-emerald-500 text-white" : "bg-red-500 text-white") : "bg-brand-navy/10 text-brand-navy/40"}`}>
+                              {idx + 1}
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-bold text-brand-navy mb-3">{q.text}</p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {q.options.map((opt: string, optIdx: number) => {
+                                  const isSelected = answerIdx === optIdx;
+                                  const isActualCorrect = q.correctAnswerIndex === optIdx;
+                                  
+                                  let optClass = "bg-white border-brand-navy/10 text-brand-navy/60";
+                                  if (isAnswered) {
+                                    if (isSelected && isActualCorrect) optClass = "bg-emerald-500 border-emerald-500 text-white";
+                                    else if (isSelected && !isActualCorrect) optClass = "bg-red-500 border-red-500 text-white";
+                                    else if (!isSelected && isActualCorrect) optClass = "bg-emerald-100 border-emerald-200 text-emerald-700";
+                                  }
+
+                                  return (
+                                    <div key={optIdx} className={`p-3 rounded-xl border text-sm font-medium ${optClass}`}>
+                                      {opt}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-8 bg-white rounded-3xl border border-brand-navy/5 text-brand-navy/40 font-bold">
+                      Data sesi tidak tersedia.
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>
