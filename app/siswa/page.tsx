@@ -43,7 +43,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import StudentOnboardingModal from "@/components/StudentOnboardingModal";
-import Avatar from "@/components/Avatar";
+import Avatar, { DICEBEAR_STYLES } from "@/components/Avatar";
 import { motion, AnimatePresence } from "motion/react";
 import Shop from "@/components/Shop";
 
@@ -83,11 +83,15 @@ export default function SiswaDashboard() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [viewingMaterial, setViewingMaterial] = useState<Material | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [viewingAssignment, setViewingAssignment] = useState<Assignment | null>(null);
+  const [viewingAssignment, setViewingAssignment] = useState<Assignment | null>(
+    null,
+  );
   const [viewingHistory, setViewingHistory] = useState<any>(null);
   const [submissionContent, setSubmissionContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [userSubmissions, setUserSubmissions] = useState<Record<string, any>>({});
+  const [userSubmissions, setUserSubmissions] = useState<Record<string, any>>(
+    {},
+  );
 
   const ACHIEVEMENTS = [
     {
@@ -150,7 +154,7 @@ export default function SiswaDashboard() {
           collection(db, "users"),
           where("role", "==", "Siswa"),
           where("xp", ">", 0),
-          orderBy("xp", "desc")
+          orderBy("xp", "desc"),
         );
         const snapshotLeaderboard = await getDocs(qLeaderboard);
         const users = snapshotLeaderboard.docs.map((doc) => ({
@@ -201,7 +205,7 @@ export default function SiswaDashboard() {
           const qAssignments = query(
             collection(db, "assignments"),
             where("targetClass", "in", ["Semua Kelas", userData.studentClass]),
-            orderBy("createdAt", "desc")
+            orderBy("createdAt", "desc"),
           );
           const snapshotAssignments = await getDocs(qAssignments);
           const assignmentsData = snapshotAssignments.docs.map(
@@ -212,7 +216,13 @@ export default function SiswaDashboard() {
           // 6. Fetch User Submissions
           const submissions: Record<string, any> = {};
           for (const asg of assignmentsData) {
-            const subRef = doc(db, "assignments", asg.id, "submissions", userData.uid);
+            const subRef = doc(
+              db,
+              "assignments",
+              asg.id,
+              "submissions",
+              userData.uid,
+            );
             const subSnap = await getDoc(subRef);
             if (subSnap.exists()) {
               submissions[asg.id] = subSnap.data();
@@ -226,7 +236,12 @@ export default function SiswaDashboard() {
     };
 
     fetchData();
-  }, [userData?.uid, userData?.xp, userData?.quizzesPlayed, userData?.studentClass]);
+  }, [
+    userData?.uid,
+    userData?.xp,
+    userData?.quizzesPlayed,
+    userData?.studentClass,
+  ]);
 
   const xp = userData?.xp || 0;
   const quizzesPlayed = userData?.quizzesPlayed || 0;
@@ -663,7 +678,8 @@ export default function SiswaDashboard() {
                         </span>
                         {asg.deadline && (
                           <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest">
-                            Deadline: {asg.deadline.toDate().toLocaleDateString("id-ID")}
+                            Deadline:{" "}
+                            {asg.deadline.toDate().toLocaleDateString("id-ID")}
                           </span>
                         )}
                       </div>
@@ -757,16 +773,25 @@ export default function SiswaDashboard() {
                     <label className="block text-[10px] font-black text-brand-navy/40 uppercase tracking-widest mb-4 ml-1">
                       Kustomisasi Avatar
                     </label>
-                    
+
                     <div className="bg-brand-cream/30 p-6 rounded-3xl border border-brand-navy/5 space-y-6">
                       <div className="flex flex-col sm:flex-row items-center gap-6">
-                        <Avatar avatarString={userData.avatar} size="lg" className="border-4 border-white shadow-xl" />
+                        <Avatar
+                          avatarString={userData.avatar}
+                          size="lg"
+                          className="border-4 border-white shadow-xl"
+                        />
                         <div className="flex-1 space-y-3 w-full">
                           <button
                             onClick={() => {
-                              const currentStyle = userData.avatar?.split(":")[0] || "adventurer";
-                              const newSeed = Math.random().toString(36).substring(7);
-                              updateProfile({ avatar: `${currentStyle}:${newSeed}` });
+                              const currentStyle =
+                                userData.avatar?.split(":")[0] || "adventurer";
+                              const newSeed = Math.random()
+                                .toString(36)
+                                .substring(7);
+                              updateProfile({
+                                avatar: `${currentStyle}:${newSeed}`,
+                              });
                             }}
                             className="w-full flex items-center justify-center gap-2 bg-brand-navy text-white py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-brand-black transition-all active:scale-95"
                           >
@@ -774,7 +799,8 @@ export default function SiswaDashboard() {
                             Acak Karakter
                           </button>
                           <p className="text-[10px] text-brand-navy/40 font-medium text-center sm:text-left">
-                            Klik tombol di atas untuk mendapatkan tampilan baru dengan gaya yang sama.
+                            Klik tombol di atas untuk mendapatkan tampilan baru
+                            dengan gaya yang sama.
                           </p>
                         </div>
                       </div>
@@ -788,8 +814,11 @@ export default function SiswaDashboard() {
                             <button
                               key={style}
                               onClick={() => {
-                                const currentSeed = userData.avatar?.split(":")[1] || "seed";
-                                updateProfile({ avatar: `${style}:${currentSeed}` });
+                                const currentSeed =
+                                  userData.avatar?.split(":")[1] || "seed";
+                                updateProfile({
+                                  avatar: `${style}:${currentSeed}`,
+                                });
                               }}
                               className={`p-1 rounded-xl border-2 transition-all ${
                                 userData.avatar?.startsWith(style)
@@ -797,7 +826,11 @@ export default function SiswaDashboard() {
                                   : "border-transparent bg-white hover:border-brand-orange/30"
                               }`}
                             >
-                              <Avatar avatarString={`${style}:preview`} size="sm" className="w-full h-full" />
+                              <Avatar
+                                avatarString={`${style}:preview`}
+                                size="sm"
+                                className="w-full h-full"
+                              />
                             </button>
                           ))}
                         </div>
@@ -832,13 +865,22 @@ export default function SiswaDashboard() {
                       </div>
                       <div className="flex justify-between text-xs font-bold pt-2 border-t border-brand-navy/5">
                         <span className="text-brand-navy/40">Status</span>
-                        <span className={userData.role === "Umum" ? "text-slate-500" : "text-brand-navy"}>
-                          {userData.role === "Umum" ? "Pengguna Umum" : "Siswa Terverifikasi"}
+                        <span
+                          className={
+                            userData.role === "Umum"
+                              ? "text-slate-500"
+                              : "text-brand-navy"
+                          }
+                        >
+                          {userData.role === "Umum"
+                            ? "Pengguna Umum"
+                            : "Siswa Terverifikasi"}
                         </span>
                       </div>
                       {userData.role === "Umum" && (
                         <p className="text-[9px] text-slate-400 italic leading-tight mt-1">
-                          *Akun ini menjadi &apos;Umum&apos; karena No Absen &amp; Kelas sudah digunakan oleh email lain.
+                          *Akun ini menjadi &apos;Umum&apos; karena No Absen
+                          &amp; Kelas sudah digunakan oleh email lain.
                         </p>
                       )}
                     </div>
@@ -850,7 +892,11 @@ export default function SiswaDashboard() {
                         Pencapaian
                       </span>
                       <span className="text-[10px] font-black text-brand-orange uppercase tracking-widest">
-                        {ACHIEVEMENTS.filter(a => a.condition(userData)).length}/{ACHIEVEMENTS.length}
+                        {
+                          ACHIEVEMENTS.filter((a) => a.condition(userData))
+                            .length
+                        }
+                        /{ACHIEVEMENTS.length}
                       </span>
                     </div>
                     <div className="grid grid-cols-1 gap-3">
@@ -865,7 +911,9 @@ export default function SiswaDashboard() {
                                 : "bg-brand-cream/20 border-transparent opacity-50 grayscale"
                             }`}
                           >
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isUnlocked ? achievement.color : "bg-slate-100 text-slate-400"}`}>
+                            <div
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center ${isUnlocked ? achievement.color : "bg-slate-100 text-slate-400"}`}
+                            >
                               {achievement.icon}
                             </div>
                             <div>
@@ -1038,7 +1086,10 @@ export default function SiswaDashboard() {
                     </span>
                     {viewingAssignment.deadline && (
                       <span className="px-2 py-1 bg-red-50 text-red-500 text-[10px] font-black uppercase tracking-widest rounded-md">
-                        Deadline: {viewingAssignment.deadline.toDate().toLocaleDateString("id-ID")}
+                        Deadline:{" "}
+                        {viewingAssignment.deadline
+                          .toDate()
+                          .toLocaleDateString("id-ID")}
                       </span>
                     )}
                   </div>
@@ -1055,9 +1106,11 @@ export default function SiswaDashboard() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 md:p-8">
-                <div 
+                <div
                   className="prose prose-sm md:prose-base max-w-none text-brand-navy/80 mb-8"
-                  dangerouslySetInnerHTML={{ __html: viewingAssignment.content }}
+                  dangerouslySetInnerHTML={{
+                    __html: viewingAssignment.content,
+                  }}
                 />
 
                 <div className="mt-8 pt-8 border-t border-brand-navy/5">
@@ -1076,15 +1129,25 @@ export default function SiswaDashboard() {
                         {userSubmissions[viewingAssignment.id].content}
                       </p>
                       <div className="text-[10px] text-emerald-600/60 font-bold uppercase tracking-widest">
-                        Dikumpulkan pada: {userSubmissions[viewingAssignment.id].submittedAt?.toDate().toLocaleString("id-ID")}
+                        Dikumpulkan pada:{" "}
+                        {userSubmissions[viewingAssignment.id].submittedAt
+                          ?.toDate()
+                          .toLocaleString("id-ID")}
                       </div>
-                      {userSubmissions[viewingAssignment.id].grade !== undefined && (
+                      {userSubmissions[viewingAssignment.id].grade !==
+                        undefined && (
                         <div className="mt-4 pt-4 border-t border-emerald-100">
-                          <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Nilai:</div>
-                          <div className="text-3xl font-black text-emerald-700">{userSubmissions[viewingAssignment.id].grade}</div>
+                          <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">
+                            Nilai:
+                          </div>
+                          <div className="text-3xl font-black text-emerald-700">
+                            {userSubmissions[viewingAssignment.id].grade}
+                          </div>
                           {userSubmissions[viewingAssignment.id].feedback && (
                             <div className="mt-2 text-xs text-emerald-800 italic">
-                              &quot;{userSubmissions[viewingAssignment.id].feedback}&quot;
+                              &quot;
+                              {userSubmissions[viewingAssignment.id].feedback}
+                              &quot;
                             </div>
                           )}
                         </div>
@@ -1103,17 +1166,26 @@ export default function SiswaDashboard() {
                           if (!submissionContent.trim() || isSubmitting) return;
                           setIsSubmitting(true);
                           try {
-                            const subRef = doc(db, "assignments", viewingAssignment.id, "submissions", userData.uid);
+                            const subRef = doc(
+                              db,
+                              "assignments",
+                              viewingAssignment.id,
+                              "submissions",
+                              userData.uid,
+                            );
                             const submissionData = {
                               studentId: userData.uid,
                               studentName: userData.displayName,
                               studentClass: userData.studentClass,
                               content: submissionContent,
                               submittedAt: new Date(),
-                              status: "submitted"
+                              status: "submitted",
                             };
                             await setDoc(subRef, submissionData);
-                            setUserSubmissions(prev => ({ ...prev, [viewingAssignment.id]: submissionData }));
+                            setUserSubmissions((prev) => ({
+                              ...prev,
+                              [viewingAssignment.id]: submissionData,
+                            }));
                             setSubmissionContent("");
                             alert("Tugas berhasil dikumpulkan!");
                           } catch (err) {
@@ -1172,7 +1244,8 @@ export default function SiswaDashboard() {
                       Maaf, data pertanyaan untuk kuis ini tidak tersedia.
                     </p>
                     <p className="text-[10px] text-brand-navy/20 uppercase tracking-widest mt-2">
-                      Hanya kuis yang diselesaikan setelah pembaruan ini yang dapat ditinjau.
+                      Hanya kuis yang diselesaikan setelah pembaruan ini yang
+                      dapat ditinjau.
                     </p>
                   </div>
                 ) : (
@@ -1199,7 +1272,8 @@ export default function SiswaDashboard() {
                         <div className="grid grid-cols-1 gap-2 pl-12">
                           {q.options.map((opt: string, oIdx: number) => {
                             const isStudentChoice = studentAnswer === oIdx;
-                            const isCorrectChoice = oIdx === q.correctAnswerIndex;
+                            const isCorrectChoice =
+                              oIdx === q.correctAnswerIndex;
 
                             let borderClass = "border-brand-navy/5";
                             let bgClass = "bg-white";
@@ -1300,7 +1374,7 @@ export default function SiswaDashboard() {
                   ))}
                 </div>
               ) : viewingMaterial.content ? (
-                <div 
+                <div
                   className="prose prose-sm md:prose-base max-w-none text-brand-navy/80"
                   dangerouslySetInnerHTML={{ __html: viewingMaterial.content }}
                 />

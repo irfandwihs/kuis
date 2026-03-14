@@ -55,8 +55,8 @@ export default function Avatar({
   }
 
   const safeAvatarString = avatarString || "adventurer:seed";
-  
-  // Logic: if string contains ':', it's "style:seed". 
+
+  // Logic: if string contains ':', it's "style:seed".
   // If it's just a number (old data), we map it to a default style.
   let style = "adventurer";
   let seed = safeAvatarString;
