@@ -784,8 +784,19 @@ export default function SiswaDashboard() {
                         <div className="flex-1 space-y-3 w-full">
                           <button
                             onClick={() => {
-                              const currentStyle =
-                                userData.avatar?.split(":")[0] || "adventurer";
+                              const parts = (userData.avatar || "").split(":");
+                              let currentStyle = parts[0] || "adventurer";
+
+                              // Validate style, if numeric or invalid, pick from DICEBEAR_STYLES
+                              if (!DICEBEAR_STYLES.includes(currentStyle)) {
+                                const idx = parseInt(currentStyle, 10);
+                                currentStyle = !isNaN(idx)
+                                  ? DICEBEAR_STYLES[
+                                      idx % DICEBEAR_STYLES.length
+                                    ]
+                                  : "adventurer";
+                              }
+
                               const newSeed = Math.random()
                                 .toString(36)
                                 .substring(7);
@@ -814,14 +825,20 @@ export default function SiswaDashboard() {
                             <button
                               key={style}
                               onClick={() => {
+                                const parts = (userData.avatar || "").split(
+                                  ":",
+                                );
+                                // If old data (numeric), use it as seed, otherwise use the seed part
                                 const currentSeed =
-                                  userData.avatar?.split(":")[1] || "seed";
+                                  parts.length > 1
+                                    ? parts[1]
+                                    : userData.avatar || "seed";
                                 updateProfile({
                                   avatar: `${style}:${currentSeed}`,
                                 });
                               }}
                               className={`p-1 rounded-xl border-2 transition-all ${
-                                userData.avatar?.startsWith(style)
+                                userData.avatar?.startsWith(style + ":")
                                   ? "border-brand-orange bg-brand-orange/5"
                                   : "border-transparent bg-white hover:border-brand-orange/30"
                               }`}

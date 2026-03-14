@@ -27,17 +27,17 @@ const CAPYBARA_POSITIONS = [
 // ==========================================
 const DICEBEAR_STYLES = [
   "adventurer",
-  "adventurer-neutral",
-  "avataaars",
-  "avataaars-neutral",
   "bottts",
-  "bottts-neutral",
-  "big-ears",
-  "big-smile",
+  "lorelei",
   "fun-emoji",
-  "miniavs",
+  "avataaars",
+  "personas",
   "pixel-art",
   "open-peeps",
+  "notionists",
+  "big-ears",
+  "big-smile",
+  "miniavs",
 ];
 
 export default function Avatar({
@@ -63,8 +63,18 @@ export default function Avatar({
 
   if (safeAvatarString.includes(":")) {
     const parts = safeAvatarString.split(":");
-    style = parts[0];
-    seed = parts[1];
+    const potentialStyle = parts[0];
+    if (DICEBEAR_STYLES.includes(potentialStyle)) {
+      style = potentialStyle;
+      seed = parts[1] || "seed";
+    } else {
+      // If style part is invalid (e.g. old numeric ID followed by :seed)
+      const idx = parseInt(potentialStyle, 10);
+      if (!isNaN(idx)) {
+        style = DICEBEAR_STYLES[idx % DICEBEAR_STYLES.length];
+        seed = parts[1] || `user-${idx}`;
+      }
+    }
   } else {
     // Fallback for old numeric IDs
     const idx = parseInt(safeAvatarString, 10);
