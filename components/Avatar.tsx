@@ -27,17 +27,17 @@ const CAPYBARA_POSITIONS = [
 // ==========================================
 const DICEBEAR_STYLES = [
   "adventurer",
-  "bottts",
-  "lorelei",
-  "fun-emoji",
+  "adventurer-neutral",
   "avataaars",
-  "personas",
-  "pixel-art",
-  "open-peeps",
-  "notionists",
+  "avataaars-neutral",
+  "bottts",
+  "bottts-neutral",
   "big-ears",
   "big-smile",
+  "fun-emoji",
   "miniavs",
+  "pixel-art",
+  "open-peeps",
 ];
 
 export default function Avatar({
