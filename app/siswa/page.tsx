@@ -204,7 +204,7 @@ export default function SiswaDashboard() {
         );
         setMaterials(materialsData);
 
-        // 5. Fetch Assignments and Quizzes
+        // 5. Fetch Assignments
         if (userData.studentClass) {
           const qAssignments = query(
             collection(db, "assignments"),
@@ -216,17 +216,6 @@ export default function SiswaDashboard() {
             (doc) => ({ id: doc.id, ...doc.data() }) as Assignment,
           );
           setAssignments(assignmentsData);
-
-          const qQuizzes = query(
-            collection(db, "quizzes"),
-            where("targetClass", "in", ["Semua Kelas", userData.studentClass]),
-            orderBy("createdAt", "desc"),
-          );
-          const snapshotQuizzes = await getDocs(qQuizzes);
-          const quizzesData = snapshotQuizzes.docs.map(
-            (doc) => ({ id: doc.id, ...doc.data() })
-          );
-          setAvailableQuizzes(quizzesData);
 
           // 6. Fetch User Submissions
           const submissions: Record<string, any> = {};
@@ -245,6 +234,17 @@ export default function SiswaDashboard() {
           }
           setUserSubmissions(submissions);
         }
+
+        // Fetch Quizzes (Available for all students)
+        const qQuizzes = query(
+          collection(db, "quizzes"),
+          orderBy("createdAt", "desc"),
+        );
+        const snapshotQuizzes = await getDocs(qQuizzes);
+        const quizzesData = snapshotQuizzes.docs.map(
+          (doc) => ({ id: doc.id, ...doc.data() })
+        );
+        setAvailableQuizzes(quizzesData);
       } catch (error) {
         console.error("Error fetching data:", error);
       }
@@ -733,7 +733,7 @@ export default function SiswaDashboard() {
               {availableQuizzes.length === 0 ? (
                 <div className="text-center py-12 bg-white rounded-[40px] shadow-sm border border-brand-navy/5">
                   <p className="text-brand-navy/40 font-bold text-sm">
-                    Belum ada kuis yang tersedia untuk kelas kamu.
+                    Belum ada kuis yang tersedia.
                   </p>
                 </div>
               ) : (
