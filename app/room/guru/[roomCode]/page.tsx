@@ -47,6 +47,11 @@ export default function GuruRoom() {
     await updateDoc(doc(db, "rooms", room.id), { status });
   };
 
+  const updateTimerStatus = async (useTimer: boolean) => {
+    if (!room?.id) return;
+    await updateDoc(doc(db, "rooms", room.id), { useTimer });
+  };
+
   const downloadCSV = () => {
     if (leaderboard.length === 0) return;
 
@@ -123,6 +128,28 @@ export default function GuruRoom() {
                   <FileText className="w-6 h-6" /> Lihat Laporan
                 </button>
               )}
+            </div>
+            
+            {/* Timer Toggle */}
+            <div className="flex items-center justify-between p-4 bg-brand-cream/50 border border-brand-navy/5 rounded-2xl">
+              <div className="flex items-center gap-3 text-left">
+                <div className="w-10 h-10 rounded-full bg-brand-orange/10 flex items-center justify-center text-brand-orange">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-brand-navy text-sm">Gunakan Timer</h4>
+                  <p className="text-[10px] text-brand-navy/60">Batas waktu 30 detik per pertanyaan</p>
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={room.useTimer ?? false}
+                  onChange={(e) => updateTimerStatus(e.target.checked)}
+                />
+                <div className="w-11 h-6 bg-brand-navy/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-orange"></div>
+              </label>
             </div>
             
             {/* Race Mode Button */}
@@ -375,7 +402,7 @@ export default function GuruRoom() {
 
               <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-brand-cream/10">
                 {/* Summary Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                   <div className="bg-white p-4 rounded-3xl border border-brand-navy/5 shadow-sm text-center">
                     <div className="text-brand-navy/40 font-black text-[10px] uppercase tracking-widest mb-1">Skor (XP)</div>
                     <div className="text-2xl font-black text-brand-orange">{selectedStudent.score}</div>
@@ -394,6 +421,35 @@ export default function GuruRoom() {
                     <div className="text-brand-navy/40 font-black text-[10px] uppercase tracking-widest mb-1">Pelanggaran</div>
                     <div className={`text-2xl font-black ${selectedStudent.cheatCount > 0 ? "text-red-500" : "text-emerald-500"}`}>
                       {selectedStudent.cheatCount || 0}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                  <div className="bg-white p-4 rounded-3xl border border-brand-navy/5 shadow-sm flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
+                      <Clock className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-brand-navy/40 font-black text-[10px] uppercase tracking-widest mb-0.5">Waktu Mulai</div>
+                      <div className="font-bold text-brand-navy">
+                        {selectedStudent.activityLogs?.find((l: any) => l.type === "start") 
+                          ? new Date(selectedStudent.activityLogs.find((l: any) => l.type === "start").timestamp).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) 
+                          : "-"}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-white p-4 rounded-3xl border border-brand-navy/5 shadow-sm flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-brand-navy/40 font-black text-[10px] uppercase tracking-widest mb-0.5">Waktu Selesai</div>
+                      <div className="font-bold text-brand-navy">
+                        {selectedStudent.activityLogs?.find((l: any) => l.type === "finish") 
+                          ? new Date(selectedStudent.activityLogs.find((l: any) => l.type === "finish").timestamp).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) 
+                          : (selectedStudent.status === "finished" && selectedStudent.submittedAt ? new Date(selectedStudent.submittedAt.toDate()).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "-")}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -474,7 +530,7 @@ export default function GuruRoom() {
                               {idx + 1}
                             </div>
                             <div className="flex-1">
-                              <p className="font-bold text-brand-navy mb-3">{q.text}</p>
+                              <p className="font-bold text-brand-navy mb-3">{q.question || q.text}</p>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {q.options.map((opt: string, optIdx: number) => {
                                   const isSelected = answerIdx === optIdx;

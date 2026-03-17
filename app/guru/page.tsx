@@ -111,10 +111,11 @@ export default function GuruDashboard() {
   const [topic, setTopic] = useState("");
   const [numQuestions, setNumQuestions] = useState(5);
   const [quizType, setQuizType] = useState<
-    "multiple_choice" | "true_false" | "duck_hunt" | "hidden_word" | "mixed_1" | "mixed_2"
+    "multiple_choice" | "true_false" | "duck_hunt" | "fishing" | "hidden_word" | "mixed_1" | "mixed_2"
   >("multiple_choice");
   const [viewingQuiz, setViewingQuiz] = useState<Quiz | null>(null);
   const [selectedClass, setSelectedClass] = useState<string>("Semua Kelas");
+  const [useTimer, setUseTimer] = useState<boolean>(true);
   const [availableClasses, setAvailableClasses] = useState<string[]>([]);
 
   useEffect(() => {
@@ -161,10 +162,10 @@ export default function GuruDashboard() {
   const [isCreatingManualQuiz, setIsCreatingManualQuiz] = useState(false);
   const [manualQuizTitle, setManualQuizTitle] = useState("");
   const [manualQuizType, setManualQuizType] = useState<
-    "multiple_choice" | "true_false" | "duck_hunt" | "hidden_word" | "mixed_1" | "mixed_2"
+    "multiple_choice" | "true_false" | "duck_hunt" | "fishing" | "hidden_word" | "mixed_1" | "mixed_2"
   >("multiple_choice");
   const [currentManualQuestionType, setCurrentManualQuestionType] = useState<
-    "multiple_choice" | "true_false" | "duck_hunt"
+    "multiple_choice" | "true_false" | "duck_hunt" | "fishing"
   >("multiple_choice");
   const [manualHiddenWord, setManualHiddenWord] = useState("");
   const [manualQuestions, setManualQuestions] = useState<any[]>([]);
@@ -499,10 +500,10 @@ export default function GuruDashboard() {
           prompt = `Buatlah kuis campuran tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pertanyaan. Campurkan pertanyaan pilihan ganda (4 pilihan) dan pertanyaan Benar/Salah (2 pilihan: ["Benar", "Salah"]). Untuk setiap pertanyaan, tentukan 'type' sebagai 'multiple_choice' atau 'true_false'.${commonInstructions}`;
           optionsDescription = 'Either 4 options or exactly 2 options: ["Benar", "Salah"]';
         } else if (quizType === "mixed_2") {
-          prompt = `Buatlah kuis campuran tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pertanyaan. Campurkan pertanyaan pilihan ganda (4 pilihan), pertanyaan Benar/Salah (2 pilihan: ["Benar", "Salah"]), dan pertanyaan berburu bebek (4 pilihan). Untuk setiap pertanyaan, tentukan 'type' sebagai 'multiple_choice', 'true_false', atau 'duck_hunt'.${commonInstructions}`;
+          prompt = `Buatlah kuis campuran tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pertanyaan. Campurkan pertanyaan pilihan ganda (4 pilihan), pertanyaan Benar/Salah (2 pilihan: ["Benar", "Salah"]), berburu bebek (4 pilihan), dan memancing ikan (4 pilihan). Untuk setiap pertanyaan, tentukan 'type' sebagai 'multiple_choice', 'true_false', 'duck_hunt', atau 'fishing'.${commonInstructions}`;
           optionsDescription = 'Either 4 options or exactly 2 options: ["Benar", "Salah"]';
         } else {
-          // Both multiple_choice and duck_hunt use 4 options
+          // Both multiple_choice, duck_hunt, and fishing use 4 options
           prompt = `Buatlah kuis pilihan ganda tentang ${topic} untuk kelas ${userData.subject} dalam Bahasa Indonesia. Sertakan ${finalNumQuestions} pertanyaan. Berikan 4 pilihan jawaban untuk setiap pertanyaan.${commonInstructions}`;
           optionsDescription = "Exactly 4 options";
         }
@@ -538,7 +539,7 @@ export default function GuruDashboard() {
             type: Type.STRING,
             description: quizType === "mixed_1" 
               ? "The type of question: 'multiple_choice' or 'true_false'" 
-              : "The type of question: 'multiple_choice', 'true_false', or 'duck_hunt'",
+              : "The type of question: 'multiple_choice', 'true_false', 'duck_hunt', or 'fishing'",
           };
           schemaProperties.questions.items.required.push("type");
         }
@@ -624,6 +625,7 @@ export default function GuruDashboard() {
       guruId: userData?.uid,
       status: "waiting",
       targetClass: selectedClass,
+      useTimer,
       createdAt: new Date(),
     });
     router.push(`/room/guru/${roomCode}`);
@@ -935,9 +937,10 @@ export default function GuruDashboard() {
                       </option>
                       <option value="true_false">Benar / Salah (Buzzer)</option>
                       <option value="duck_hunt">Berburu Bebek (Duck Hunt)</option>
+                      <option value="fishing">Memancing Ikan (Fishing)</option>
                       <option value="hidden_word">Tebak Kata Tersembunyi</option>
                       <option value="mixed_1">Campuran 1 (Klasik + Benar/Salah)</option>
-                      <option value="mixed_2">Campuran 2 (Klasik + B/S + Bebek)</option>
+                      <option value="mixed_2">Campuran 2 (Klasik + B/S + Bebek + Ikan)</option>
                     </select>
                   </div>
                 </div>
@@ -1042,7 +1045,9 @@ export default function GuruDashboard() {
                             ? "Benar/Salah"
                             : quiz.quizType === "duck_hunt"
                               ? "Duck Hunt"
-                              : quiz.quizType === "hidden_word"
+                              : quiz.quizType === "fishing"
+                                ? "Memancing Ikan"
+                                : quiz.quizType === "hidden_word"
                                 ? "Kata Tersembunyi"
                                 : quiz.quizType === "mixed_1"
                                   ? "Campuran 1"
@@ -2107,6 +2112,21 @@ export default function GuruDashboard() {
                   ))}
                 </select>
               </div>
+              <div className="flex items-center justify-between p-4 bg-brand-cream/50 border border-brand-navy/5 rounded-2xl">
+                <div>
+                  <h4 className="font-bold text-brand-navy">Gunakan Timer</h4>
+                  <p className="text-xs text-brand-navy/60">Beri batas waktu 30 detik per pertanyaan</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={useTimer}
+                    onChange={(e) => setUseTimer(e.target.checked)}
+                  />
+                  <div className="w-11 h-6 bg-brand-navy/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-orange"></div>
+                </label>
+              </div>
               <button
                 onClick={() => {
                   createRoom(viewingQuiz.id);
@@ -2185,11 +2205,12 @@ export default function GuruDashboard() {
                       <option value="multiple_choice">Pilihan Ganda</option>
                       <option value="true_false">Benar / Salah</option>
                       <option value="duck_hunt">Berburu Bebek</option>
+                      <option value="fishing">Memancing Ikan</option>
                       <option value="hidden_word">
                         Tebak Kata Tersembunyi
                       </option>
                       <option value="mixed_1">Campuran 1 (Klasik + Benar/Salah)</option>
-                      <option value="mixed_2">Campuran 2 (Klasik + B/S + Bebek)</option>
+                      <option value="mixed_2">Campuran 2 (Klasik + B/S + Bebek + Ikan)</option>
                     </select>
                   </div>
                   {manualQuizType === "hidden_word" && (
@@ -2227,7 +2248,7 @@ export default function GuruDashboard() {
                           <span>{idx + 1}. {q.question}</span>
                           {(manualQuizType === "mixed_1" || manualQuizType === "mixed_2") && q.type && (
                             <span className="text-[8px] text-brand-orange uppercase tracking-widest mt-0.5">
-                              {q.type === "true_false" ? "Benar/Salah" : q.type === "duck_hunt" ? "Berburu Bebek" : "Pilihan Ganda"}
+                              {q.type === "true_false" ? "Benar/Salah" : q.type === "duck_hunt" ? "Berburu Bebek" : q.type === "fishing" ? "Memancing Ikan" : "Pilihan Ganda"}
                             </span>
                           )}
                         </div>
@@ -2281,7 +2302,10 @@ export default function GuruDashboard() {
                         <option value="multiple_choice">Pilihan Ganda</option>
                         <option value="true_false">Benar / Salah</option>
                         {manualQuizType === "mixed_2" && (
-                          <option value="duck_hunt">Berburu Bebek</option>
+                          <>
+                            <option value="duck_hunt">Berburu Bebek</option>
+                            <option value="fishing">Memancing Ikan</option>
+                          </>
                         )}
                       </select>
                     </div>

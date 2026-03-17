@@ -27,6 +27,7 @@ import {
   Medal,
   Target,
   RefreshCw,
+  Timer,
 } from "lucide-react";
 import {
   collection,
@@ -40,6 +41,7 @@ import {
   where,
   setDoc,
   getDoc,
+  addDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import StudentOnboardingModal from "@/components/StudentOnboardingModal";
@@ -82,6 +84,8 @@ export default function SiswaDashboard() {
   const [globalLeaderboard, setGlobalLeaderboard] = useState<any[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [viewingMaterial, setViewingMaterial] = useState<Material | null>(null);
+  const [availableQuizzes, setAvailableQuizzes] = useState<any[]>([]);
+  const [useTimer, setUseTimer] = useState(true);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [viewingAssignment, setViewingAssignment] = useState<Assignment | null>(
     null,
@@ -200,7 +204,7 @@ export default function SiswaDashboard() {
         );
         setMaterials(materialsData);
 
-        // 5. Fetch Assignments
+        // 5. Fetch Assignments and Quizzes
         if (userData.studentClass) {
           const qAssignments = query(
             collection(db, "assignments"),
@@ -212,6 +216,17 @@ export default function SiswaDashboard() {
             (doc) => ({ id: doc.id, ...doc.data() }) as Assignment,
           );
           setAssignments(assignmentsData);
+
+          const qQuizzes = query(
+            collection(db, "quizzes"),
+            where("targetClass", "in", ["Semua Kelas", userData.studentClass]),
+            orderBy("createdAt", "desc"),
+          );
+          const snapshotQuizzes = await getDocs(qQuizzes);
+          const quizzesData = snapshotQuizzes.docs.map(
+            (doc) => ({ id: doc.id, ...doc.data() })
+          );
+          setAvailableQuizzes(quizzesData);
 
           // 6. Fetch User Submissions
           const submissions: Record<string, any> = {};
@@ -254,6 +269,49 @@ export default function SiswaDashboard() {
     if (roomCode.length === 6) {
       router.push(`/room/siswa/${roomCode}`);
     }
+  };
+
+  const createRoomWithFriends = async (quizId: string, quizTitle: string) => {
+    if (!userData?.uid) return;
+    const roomCode = Math.floor(100000 + Math.random() * 900000).toString();
+    await addDoc(collection(db, "rooms"), {
+      roomCode,
+      quizId,
+      quizTitle,
+      hostId: userData.uid,
+      status: "waiting",
+      targetClass: userData.studentClass || "Semua Kelas",
+      useTimer: useTimer,
+      createdAt: new Date(),
+    });
+    router.push(`/room/siswa/${roomCode}`);
+  };
+
+  const createAiRoom = async (quizId: string, quizTitle: string) => {
+    if (!userData?.uid) return;
+    const roomCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const roomRef = await addDoc(collection(db, "rooms"), {
+      roomCode,
+      quizId,
+      quizTitle,
+      hostId: userData.uid,
+      status: "playing",
+      mode: "ai",
+      targetClass: userData.studentClass || "Semua Kelas",
+      useTimer: useTimer,
+      createdAt: new Date(),
+    });
+    
+    // Add AI bot to leaderboard
+    await setDoc(doc(db, "rooms", roomRef.id, "leaderboard", "ai_bot"), {
+      siswaName: "🤖 AI Bot",
+      avatar: "bot",
+      score: 0,
+      status: "playing",
+      joinedAt: new Date(),
+    });
+
+    router.push(`/room/siswa/${roomCode}`);
   };
 
   if (!userData) return null;
@@ -613,7 +671,7 @@ export default function SiswaDashboard() {
         )}
 
         {mainTab === "kuis" && (
-          <div className="flex flex-col items-center justify-center py-4">
+          <div className="flex flex-col items-center justify-center py-4 space-y-6">
             <div className="bg-white p-8 md:p-10 rounded-[40px] shadow-xl shadow-brand-navy/5 w-full text-center border border-brand-navy/5 animate-in fade-in zoom-in-95 duration-300">
               <div className="w-20 h-20 bg-brand-navy text-white rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-brand-navy/20 rotate-3 hover:rotate-0 transition-transform cursor-pointer">
                 <Play className="w-10 h-10 ml-1" />
@@ -643,6 +701,67 @@ export default function SiswaDashboard() {
                   Masuk Ruangan
                 </button>
               </form>
+            </div>
+
+            <div className="w-full space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300 delay-100">
+              <div className="flex items-center justify-between mb-6 px-2">
+                <div className="flex items-center gap-3">
+                  <Sparkles className="w-6 h-6 text-brand-orange" />
+                  <h2 className="text-xl font-black text-brand-navy tracking-tight">
+                    Kuis Tersedia
+                  </h2>
+                </div>
+                
+                <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-brand-navy/5 shadow-sm">
+                  <Timer className="w-4 h-4 text-brand-navy/60" />
+                  <span className="text-sm font-bold text-brand-navy">Gunakan Timer</span>
+                  <button
+                    onClick={() => setUseTimer(!useTimer)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      useTimer ? "bg-brand-orange" : "bg-brand-navy/20"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        useTimer ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {availableQuizzes.length === 0 ? (
+                <div className="text-center py-12 bg-white rounded-[40px] shadow-sm border border-brand-navy/5">
+                  <p className="text-brand-navy/40 font-bold text-sm">
+                    Belum ada kuis yang tersedia untuk kelas kamu.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {availableQuizzes.map((quiz) => (
+                    <div key={quiz.id} className="bg-white p-6 rounded-[32px] shadow-sm border border-brand-navy/5 flex flex-col gap-4">
+                      <div>
+                        <h3 className="font-black text-brand-navy text-lg mb-1">{quiz.title}</h3>
+                        <p className="text-xs text-brand-navy/60 font-medium">{quiz.description || "Tidak ada deskripsi"}</p>
+                      </div>
+                      <div className="flex gap-3 mt-2">
+                        <button
+                          onClick={() => createRoomWithFriends(quiz.id, quiz.title)}
+                          className="flex-1 bg-brand-cream text-brand-navy py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-navy/5 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Users className="w-4 h-4" /> Mabar
+                        </button>
+                        <button
+                          onClick={() => createAiRoom(quiz.id, quiz.title)}
+                          className="flex-1 bg-brand-orange text-white py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-orange/90 shadow-lg shadow-brand-orange/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                        >
+                          <Target className="w-4 h-4" /> Lawan AI
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
