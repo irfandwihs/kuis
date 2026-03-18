@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   collection,
@@ -33,8 +33,6 @@ import {
   WifiOff,
   Loader2,
   X,
-  Timer,
-  Play,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 
@@ -87,8 +85,6 @@ export default function SiswaRoom() {
   const [usedItemsInSession, setUsedItemsInSession] = useState<string[]>([]);
   const [incompleteSession, setIncompleteSession] = useState<any>(null);
   const [showResumePrompt, setShowResumePrompt] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<number>(30);
-  const [fishingTarget, setFishingTarget] = useState<number | null>(null);
 
   const playSound = (type: "correct" | "incorrect" | "item") => {
     const audio = new Audio(
@@ -240,7 +236,7 @@ export default function SiswaRoom() {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, [room, submitted, userData?.uid]);
+  }, [room, submitted]);
 
   useEffect(() => {
     if (!roomCode) return;
@@ -548,98 +544,6 @@ export default function SiswaRoom() {
     }, 1500);
   };
 
-  // Timer logic
-  useEffect(() => {
-    if (
-      !room ||
-      !room.useTimer ||
-      room.status !== "playing" ||
-      !quiz ||
-      questions.length === 0 ||
-      submitted ||
-      feedback ||
-      isAnswering ||
-      showReview ||
-      showResumePrompt ||
-      answers[String(currentQuestionIdx)] !== undefined
-    ) {
-      return;
-    }
-
-    setTimeLeft(30);
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => Math.max(0, prev - 1));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [
-    currentQuestionIdx,
-    room,
-    quiz,
-    questions.length,
-    submitted,
-    feedback,
-    isAnswering,
-    showReview,
-    showResumePrompt,
-    answers,
-  ]);
-
-  const handleAnswerRef = useRef(handleAnswer);
-  useEffect(() => {
-    handleAnswerRef.current = handleAnswer;
-  });
-
-  useEffect(() => {
-    if (
-      room?.useTimer &&
-      timeLeft === 0 &&
-      !isAnswering &&
-      !feedback &&
-      answers[String(currentQuestionIdx)] === undefined
-    ) {
-      handleAnswerRef.current(-1);
-    }
-  }, [timeLeft, isAnswering, feedback, answers, currentQuestionIdx, room?.useTimer]);
-
-  // AI Bot Simulation
-  useEffect(() => {
-    if (room?.mode !== "ai" || room?.status !== "playing" || submitted || !questions.length) return;
-
-    // Only the host simulates the AI to avoid multiple updates
-    if (room.hostId !== userData?.uid) return;
-
-    const maxScore = questions.length * 100;
-
-    const simulateAi = async () => {
-      // Get current AI score
-      const aiRef = doc(db, "rooms", room.id, "leaderboard", "ai_bot");
-      const aiSnap = await getDoc(aiRef);
-      if (!aiSnap.exists()) return;
-      
-      const currentScore = aiSnap.data().score || 0;
-      if (currentScore >= maxScore) return;
-
-      // AI answers correctly 70% of the time
-      const isCorrect = Math.random() < 0.7;
-      const points = isCorrect ? 100 : 0;
-
-      if (points > 0) {
-        try {
-          await updateDoc(aiRef, {
-            score: increment(points),
-          });
-        } catch (e) {
-          console.error("Failed to update AI score", e);
-        }
-      }
-    };
-
-    // AI answers every 10-20 seconds
-    const interval = setInterval(simulateAi, Math.floor(Math.random() * 10000) + 10000);
-    return () => clearInterval(interval);
-  }, [room?.mode, room?.status, room?.id, room?.hostId, userData?.uid, submitted, questions.length]);
-
   const submitQuiz = async () => {
     if (!room?.id || !userData?.uid) return;
 
@@ -901,8 +805,6 @@ export default function SiswaRoom() {
   }
 
   if (room.status === "waiting") {
-    const isHost = room.hostId === userData?.uid;
-
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-brand-cream text-brand-navy p-4">
         <motion.div
@@ -927,30 +829,13 @@ export default function SiswaRoom() {
             Siap-siap!
           </h2>
           <p className="text-brand-navy/60 mb-8 leading-relaxed">
-            {isHost
-              ? "Ajak teman-temanmu bergabung dengan kode ruangan di bawah ini!"
-              : "Menunggu host memulai petualangan. Jangan ke mana-mana ya!"}
+            Guru sedang menyiapkan petualangan untukmu. Jangan ke mana-mana ya!
           </p>
 
-          <div className="text-4xl font-mono font-black tracking-[0.2em] text-brand-navy mb-8 bg-brand-cream/50 py-4 rounded-3xl border border-brand-navy/5">
-            {roomCode}
+          <div className="flex items-center justify-center gap-2 text-brand-orange font-bold text-sm uppercase tracking-widest">
+            <div className="w-2 h-2 bg-brand-orange rounded-full animate-ping" />
+            Menunggu Guru...
           </div>
-
-          {isHost ? (
-            <button
-              onClick={async () => {
-                await updateDoc(doc(db, "rooms", room.id), { status: "playing" });
-              }}
-              className="w-full bg-brand-orange text-white py-5 rounded-2xl font-black flex items-center justify-center gap-3 hover:bg-brand-orange/90 shadow-lg shadow-brand-orange/20 transition-all active:scale-95"
-            >
-              <Play className="w-6 h-6 fill-current" /> Mulai Kuis
-            </button>
-          ) : (
-            <div className="flex items-center justify-center gap-2 text-brand-orange font-bold text-sm uppercase tracking-widest">
-              <div className="w-2 h-2 bg-brand-orange rounded-full animate-ping" />
-              Menunggu Host...
-            </div>
-          )}
         </motion.div>
       </div>
     );
@@ -971,7 +856,8 @@ export default function SiswaRoom() {
             Kuis Berakhir
           </h2>
           <p className="text-brand-navy/60 mb-8 leading-relaxed">
-            {room.hostId === userData?.uid ? "Kamu telah mengakhiri kuis ini." : "Host telah mengakhiri petualangan ini. Sampai jumpa di kuis berikutnya!"}
+            Guru telah mengakhiri petualangan ini. Sampai jumpa di kuis
+            berikutnya!
           </p>
           <button
             onClick={() => router.push("/siswa")}
@@ -1139,18 +1025,6 @@ export default function SiswaRoom() {
                   Lanjutkan ke Dashboard
                 </button>
               </div>
-              
-              {room?.hostId === userData?.uid && room?.status !== "finished" && (
-                <button
-                  onClick={async () => {
-                    await updateDoc(doc(db, "rooms", room.id), { status: "finished" });
-                    router.push("/siswa");
-                  }}
-                  className="w-full mt-4 bg-red-500 text-white font-black text-lg py-5 rounded-3xl hover:bg-red-600 transition-all shadow-xl shadow-red-500/20"
-                >
-                  Akhiri Kuis untuk Semua
-                </button>
-              )}
             </motion.div>
           ) : (
             <motion.div
@@ -1283,13 +1157,6 @@ export default function SiswaRoom() {
     },
   ];
 
-  const fishPaths = [
-    { x: ["10%", "80%", "10%"], y: ["40%", "45%", "40%"] },
-    { x: ["80%", "10%", "80%"], y: ["55%", "60%", "55%"] },
-    { x: ["20%", "70%", "20%"], y: ["70%", "75%", "70%"] },
-    { x: ["70%", "20%", "70%"], y: ["85%", "80%", "85%"] },
-  ];
-
   return (
     <div 
       className="min-h-screen bg-brand-cream flex flex-col items-center overflow-hidden select-none"
@@ -1370,17 +1237,9 @@ export default function SiswaRoom() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            {room?.useTimer && (
-              <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase transition-colors ${timeLeft <= 10 ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-brand-cream text-brand-navy'}`}>
-                <Timer className="w-3.5 h-3.5" />
-                {timeLeft}s
-              </div>
-            )}
-            <span className="font-mono bg-brand-navy text-white px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase">
-              RUANGAN: {roomCode}
-            </span>
-          </div>
+          <span className="font-mono bg-brand-navy text-white px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase">
+            RUANGAN: {roomCode}
+          </span>
         </div>
 
         <motion.div
@@ -1517,148 +1376,6 @@ export default function SiswaRoom() {
                   </motion.button>
                 );
               })}
-            </div>
-          ) : currentQuestionType === "fishing" ? (
-            <div
-              className="relative w-full h-[400px] md:h-[500px] bg-[#0077be] rounded-3xl overflow-hidden border-8 border-black shadow-inner"
-              style={{ imageRendering: "pixelated" }}
-            >
-              {/* Water Surface */}
-              <div className="absolute top-0 left-0 w-full h-32 bg-[#4fc3f7] opacity-30 z-0" />
-              
-              {/* Bubbles */}
-              {[...Array(10)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  animate={{
-                    y: [-20, -500],
-                    opacity: [0, 1, 0],
-                  }}
-                  transition={{
-                    duration: 5 + Math.random() * 5,
-                    repeat: Infinity,
-                    delay: Math.random() * 5,
-                  }}
-                  className="absolute w-2 h-2 bg-white/30 rounded-full"
-                  style={{
-                    left: `${Math.random() * 100}%`,
-                    bottom: "-20px",
-                  }}
-                />
-              ))}
-
-              {/* Fisherman on Boat */}
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center">
-                <div className="relative">
-                  {/* Boat */}
-                  <svg width="100" height="40" viewBox="0 0 32 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M2 4h28l-4 8H6l-4-8z" fill="#5d4037" />
-                    <path d="M6 4h20v2H6V4z" fill="#795548" />
-                  </svg>
-                  
-                  {/* Fisherman */}
-                  <div className="absolute -top-12 left-1/2 -translate-x-1/2">
-                    <svg width="40" height="40" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M6 4h4v4H6V4z" fill="#ffe0bd" /> {/* Head */}
-                      <path d="M5 2h6v2H5V2z" fill="#fbc02d" /> {/* Hat */}
-                      <path d="M6 8h4v6H6V8z" fill="#1976d2" /> {/* Body */}
-                    </svg>
-                  </div>
-
-                  {/* Fishing Rod */}
-                  <motion.div 
-                    className="absolute top-[-10px] right-[-20px] origin-bottom-left"
-                    animate={{ rotate: isAnswering ? [0, 20, 0] : [0, 5, 0] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  >
-                    <div className="w-20 h-1 bg-black rounded-full rotate-[-45deg]" />
-                  </motion.div>
-                </div>
-              </div>
-
-              {currentQ.options.map((opt: string, idx: number) => {
-                const isSelected = answers[String(currentQuestionIdx)] === idx;
-                const isCorrect = idx === currentQ.correctAnswerIndex;
-                const isRemoved = removedOptions.includes(idx);
-
-                if (isRemoved) return null;
-
-                const path = fishPaths[idx % 4];
-
-                let btnClass = "bg-white text-black border-4 border-black";
-                if (feedback && isCorrect)
-                  btnClass = "bg-[#4ade80] text-black border-4 border-black";
-                else if (feedback && isSelected && !isCorrect)
-                  btnClass = "bg-[#f87171] text-black border-4 border-black";
-                else if (isSelected)
-                  btnClass = "bg-[#facc15] text-black border-4 border-black";
-
-                return (
-                  <motion.button
-                    key={idx}
-                    disabled={
-                      isAnswering ||
-                      feedback !== null ||
-                      isRemoved ||
-                      answers[currentQuestionIdx] !== undefined
-                    }
-                    onClick={() => {
-                      setFishingTarget(idx);
-                      handleAnswer(idx);
-                    }}
-                    animate={{
-                      left: path.x,
-                      top: path.y,
-                    }}
-                    transition={{
-                      duration: 10 + (idx % 2) * 3,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                    className={`absolute flex flex-col items-center justify-center gap-2 active:scale-95 transition-colors z-10`}
-                    style={{ width: "140px" }}
-                  >
-                    {/* Pixel Fish SVG */}
-                    <svg
-                      width="56"
-                      height="56"
-                      viewBox="0 0 32 32"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                      style={{
-                        transform: idx % 2 === 0 ? "scaleX(-1)" : "none",
-                        filter: "drop-shadow(4px 4px 0px rgba(0,0,0,0.3))",
-                      }}
-                    >
-                      <path d="M8 12h16v8H8v-8z" fill={idx % 2 === 0 ? "#ff5722" : "#2196f3"} />
-                      <path d="M24 14h4v4h-4v-4z" fill={idx % 2 === 0 ? "#ff5722" : "#2196f3"} />
-                      <path d="M20 14h2v2h-2v-2z" fill="#000" />
-                      <path d="M10 10h4v2h-4v-2z" fill={idx % 2 === 0 ? "#ff7043" : "#42a5f5"} />
-                    </svg>
-
-                    {/* The Box */}
-                    <div
-                      className={`w-full p-2 font-mono text-[10px] md:text-xs font-black uppercase leading-tight break-words ${btnClass}`}
-                      style={{ boxShadow: "4px 4px 0px rgba(0,0,0,0.5)" }}
-                    >
-                      {opt}
-                    </div>
-                  </motion.button>
-                );
-              })}
-
-              {/* Fishing Line Animation */}
-              {isAnswering && fishingTarget !== null && (
-                <motion.div
-                  initial={{ height: 0 }}
-                  animate={{ height: "100vh" }}
-                  className="absolute top-[40px] left-1/2 w-0.5 bg-white/40 z-20 origin-top"
-                  style={{ 
-                    left: "calc(50% + 35px)",
-                    transform: "rotate(15deg)"
-                  }}
-                />
-              )}
             </div>
           ) : (
             <div

@@ -11,6 +11,9 @@
         "avatar": { "type": "string" },
         "xp": { "type": "number" },
         "diamonds": { "type": "number" },
+        "water": { "type": "number", "description": "Mata uang air untuk menyiram pohon" },
+        "treeHeight": { "type": "number", "description": "Tinggi pohon siswa dalam cm" },
+        "inventory": { "type": "object", "description": "Item yang dimiliki siswa" },
         "studentClass": { "type": "string" },
         "studentAbsen": { "type": "string" }
       },

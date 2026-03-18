@@ -28,6 +28,10 @@ import {
   Target,
   RefreshCw,
   Timer,
+  Droplets,
+  Sprout,
+  Leaf,
+  Trees,
 } from "lucide-react";
 import {
   collection,
@@ -132,7 +136,7 @@ export default function SiswaDashboard() {
     },
   ];
   const [mainTab, setMainTab] = useState<
-    "beranda" | "kuis" | "tugas" | "materi" | "profil"
+    "beranda" | "kuis" | "tugas" | "materi" | "pohon" | "profil"
   >("beranda");
   const [berandaTab, setBerandaTab] = useState<
     "history" | "leaderboard" | "shop"
@@ -314,6 +318,54 @@ export default function SiswaDashboard() {
     router.push(`/room/siswa/${roomCode}`);
   };
 
+  const waterTree = async () => {
+    if (!userData?.uid || (userData.water || 0) < 10) return;
+
+    const newWater = (userData.water || 0) - 10;
+    const newHeight = (userData.treeHeight || 0) + 1;
+
+    const updates: any = {
+      water: newWater,
+      treeHeight: newHeight,
+    };
+
+    // Check for milestones
+    if (newHeight === 10) {
+      updates.xp = (userData.xp || 0) + 50;
+      alert("Selamat! Pohonmu mencapai 10cm! Kamu mendapat 50 XP!");
+    } else if (newHeight === 50) {
+      updates.xp = (userData.xp || 0) + 100;
+      updates.diamonds = (userData.diamonds || 0) + 10;
+      alert(
+        "Selamat! Pohonmu mencapai 50cm! Kamu mendapat 100 XP dan 10 Diamond!",
+      );
+    } else if (newHeight === 100) {
+      updates.xp = (userData.xp || 0) + 200;
+      updates.diamonds = (userData.diamonds || 0) + 20;
+      const inventory = userData.inventory || {};
+      inventory.pohon_dewasa = (inventory.pohon_dewasa || 0) + 1;
+      updates.inventory = inventory;
+      alert(
+        "Selamat! Pohonmu mencapai 100cm! Kamu mendapat 200 XP, 20 Diamond, dan Item Pohon Dewasa!",
+      );
+    } else if (newHeight === 200) {
+      updates.xp = (userData.xp || 0) + 500;
+      updates.diamonds = (userData.diamonds || 0) + 50;
+      const inventory = userData.inventory || {};
+      inventory.pohon_raksasa = (inventory.pohon_raksasa || 0) + 1;
+      updates.inventory = inventory;
+      alert(
+        "Selamat! Pohonmu mencapai 200cm! Kamu mendapat 500 XP, 50 Diamond, dan Item Pohon Raksasa!",
+      );
+    }
+
+    try {
+      await updateDoc(doc(db, "users", userData.uid), updates);
+    } catch (err) {
+      console.error("Gagal menyiram pohon:", err);
+    }
+  };
+
   if (!userData) return null;
 
   return (
@@ -369,7 +421,7 @@ export default function SiswaDashboard() {
         </header>
 
         {mainTab === "beranda" && (
-          <div className="grid grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
             <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center group hover:border-brand-orange transition-all">
               <div className="p-2 bg-brand-orange/10 text-brand-orange rounded-xl mb-2 group-hover:scale-110 transition-transform">
                 <Trophy className="w-5 h-5" />
@@ -408,6 +460,17 @@ export default function SiswaDashboard() {
               </div>
               <div className="text-lg font-black text-brand-navy">
                 {userData.diamonds || 0}
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center">
+              <div className="p-2 bg-blue-100 text-blue-500 rounded-xl mb-2">
+                <Droplets className="w-5 h-5 fill-current" />
+              </div>
+              <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">
+                Air
+              </div>
+              <div className="text-lg font-black text-brand-navy">
+                {userData.water || 0}
               </div>
             </div>
           </div>
@@ -1200,6 +1263,120 @@ export default function SiswaDashboard() {
             </section>
           </div>
         )}
+
+        {mainTab === "pohon" && (
+          <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+            <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5 text-center">
+              <div className="flex items-center justify-center mb-6">
+                <div className="p-4 bg-emerald-100 text-emerald-600 rounded-full">
+                  <Trees className="w-10 h-10" />
+                </div>
+              </div>
+              <h2 className="text-2xl font-black text-brand-navy mb-2 tracking-tight">
+                Pohon Pengetahuan
+              </h2>
+              <p className="text-brand-navy/60 text-sm mb-8 leading-relaxed font-medium">
+                Sirami pohonmu untuk membuatnya tumbuh besar dan dapatkan hadiah
+                menarik!
+              </p>
+
+              <div className="relative h-64 bg-brand-cream/30 rounded-[32px] mb-8 flex items-end justify-center overflow-hidden border border-brand-navy/5">
+                <div className="absolute inset-0 flex items-center justify-center opacity-10">
+                  <Sparkles className="w-32 h-32 text-emerald-500" />
+                </div>
+
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 0.5 + (userData.treeHeight || 0) / 200 }}
+                  className="relative z-10 mb-8"
+                >
+                  {(userData.treeHeight || 0) < 10 ? (
+                    <Sprout className="w-24 h-24 text-emerald-500" />
+                  ) : (userData.treeHeight || 0) < 50 ? (
+                    <Leaf className="w-32 h-32 text-emerald-600" />
+                  ) : (
+                    <Trees className="w-48 h-48 text-emerald-700" />
+                  )}
+                </motion.div>
+
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white px-4 py-2 rounded-2xl shadow-sm border border-brand-navy/5">
+                  <span className="text-sm font-black text-brand-navy">
+                    Tinggi: {userData.treeHeight || 0} cm
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                <div className="bg-brand-cream/50 p-4 rounded-3xl border border-brand-navy/5">
+                  <div className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest mb-1">
+                    Air Tersedia
+                  </div>
+                  <div className="flex items-center justify-center gap-2 text-xl font-black text-brand-navy">
+                    <Droplets className="w-5 h-5 text-blue-500" />
+                    {userData.water || 0}
+                  </div>
+                </div>
+                <div className="bg-brand-cream/50 p-4 rounded-3xl border border-brand-navy/5">
+                  <div className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest mb-1">
+                    Biaya Siram
+                  </div>
+                  <div className="flex items-center justify-center gap-2 text-xl font-black text-brand-navy">
+                    <Droplets className="w-5 h-5 text-blue-500" />
+                    10
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={waterTree}
+                disabled={(userData.water || 0) < 10}
+                className="w-full bg-emerald-500 text-white font-black py-5 rounded-3xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 flex items-center justify-center gap-3"
+              >
+                <Droplets className="w-6 h-6" />
+                Siram Pohon (+1 cm)
+              </button>
+            </section>
+
+            <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5">
+              <h3 className="text-lg font-black text-brand-navy mb-6 flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-brand-orange" />
+                Target Pertumbuhan
+              </h3>
+              <div className="space-y-4">
+                {[
+                  { h: 10, r: "50 XP" },
+                  { h: 50, r: "100 XP + 10 Diamond" },
+                  { h: 100, r: "200 XP + 20 Diamond + Pohon Dewasa" },
+                  { h: 200, r: "500 XP + 50 Diamond + Pohon Raksasa" },
+                ].map((milestone) => (
+                  <div
+                    key={milestone.h}
+                    className={`p-4 rounded-2xl border flex items-center justify-between ${(userData.treeHeight || 0) >= milestone.h ? "bg-emerald-50 border-emerald-100" : "bg-brand-cream/30 border-brand-navy/5 opacity-60"}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${(userData.treeHeight || 0) >= milestone.h ? "bg-emerald-500 text-white" : "bg-brand-navy/10 text-brand-navy"}`}
+                      >
+                        {milestone.h}
+                      </div>
+                      <div className="text-left">
+                        <div className="text-xs font-black text-brand-navy">
+                          Target {milestone.h} cm
+                        </div>
+                        <div className="text-[10px] font-bold text-brand-navy/60 uppercase tracking-widest">
+                          {milestone.r}
+                        </div>
+                      </div>
+                    </div>
+                    {(userData.treeHeight || 0) >= milestone.h && (
+                      <CheckCircle className="w-5 h-5 text-emerald-500" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
       </div>
 
       {/* View Assignment Modal */}
@@ -1559,6 +1736,17 @@ export default function SiswaDashboard() {
           />
           <span className="text-[10px] font-black uppercase tracking-widest">
             Kuis
+          </span>
+        </button>
+        <button
+          onClick={() => setMainTab("pohon")}
+          className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "pohon" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}
+        >
+          <Sprout
+            className={`w-6 h-6 ${mainTab === "pohon" ? "fill-current" : ""}`}
+          />
+          <span className="text-[10px] font-black uppercase tracking-widest">
+            Pohon
           </span>
         </button>
         <button

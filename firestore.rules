@@ -14,6 +14,9 @@ service cloud.firestore {
     //   - avatar: string
     //   - xp: number
     //   - diamonds: number
+    //   - water: number
+    //   - treeHeight: number
+    //   - inventory: map
     //   - studentClass: string
     //   - studentAbsen: string
     //
