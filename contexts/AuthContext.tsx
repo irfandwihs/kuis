@@ -1,12 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import {
-  User,
-  onAuthStateChanged,
-  signInWithPopup,
-  signOut,
-} from "firebase/auth";
+import { User, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc, increment } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { useRouter, usePathname } from "next/navigation";
@@ -27,8 +22,6 @@ interface UserData {
   profileCompleted?: boolean;
   diamonds?: number;
   inventory?: Record<string, number>;
-  water?: number;
-  treeHeight?: number;
 }
 
 interface AuthContextType {
@@ -57,19 +50,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (currentUser) {
         const userDocRef = doc(db, "users", currentUser.uid);
         const userDoc = await getDoc(userDocRef);
-
+        
         if (userDoc.exists()) {
           const data = userDoc.data() as UserData;
           setUserData(data);
-
+          
           if (!data.role && pathname !== "/onboarding") {
             router.push("/onboarding");
           } else if (data.role) {
-            const isSiswaRoute =
-              pathname.startsWith("/siswa") ||
-              pathname.startsWith("/room/siswa");
-            const isGuruRoute =
-              pathname.startsWith("/guru") || pathname.startsWith("/room/guru");
+            const isSiswaRoute = pathname.startsWith("/siswa") || pathname.startsWith("/room/siswa");
+            const isGuruRoute = pathname.startsWith("/guru") || pathname.startsWith("/room/guru");
 
             if (data.role === "Guru" && isSiswaRoute) {
               router.push("/guru");
@@ -90,9 +80,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             diamonds: 0,
             quizzesPlayed: 0,
             avatar: "0",
-            inventory: {},
-            water: 0,
-            treeHeight: 0,
+            inventory: {}
           };
           await setDoc(userDocRef, newUserData);
           setUserData(newUserData);
@@ -139,21 +127,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       updatedData.studentClass = subjectOrClass;
     }
     await setDoc(userDocRef, updatedData, { merge: true });
-    setUserData((prev) => (prev ? { ...prev, ...updatedData } : null));
+    setUserData((prev) => prev ? { ...prev, ...updatedData } : null);
     router.push(role === "Guru" ? "/guru" : "/siswa");
   };
 
   const updateProfile = async (data: Partial<UserData>) => {
     if (!user) return;
     const userDocRef = doc(db, "users", user.uid);
-    await setDoc(
-      userDocRef,
-      { ...data, profileCompleted: true },
-      { merge: true },
-    );
-    setUserData((prev) =>
-      prev ? { ...prev, ...data, profileCompleted: true } : null,
-    );
+    await setDoc(userDocRef, { ...data, profileCompleted: true }, { merge: true });
+    setUserData((prev) => prev ? { ...prev, ...data, profileCompleted: true } : null);
   };
 
   const buyItem = async (itemId: string, price: number) => {
@@ -167,33 +149,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     await updateDoc(userDocRef, {
       diamonds: increment(-price),
-      inventory: newInventory,
+      inventory: newInventory
     });
 
-    setUserData((prev) =>
-      prev
-        ? {
-            ...prev,
-            diamonds: (prev.diamonds || 0) - price,
-            inventory: newInventory,
-          }
-        : null,
-    );
+    setUserData(prev => prev ? {
+      ...prev,
+      diamonds: (prev.diamonds || 0) - price,
+      inventory: newInventory
+    } : null);
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        userData,
-        loading,
-        signInWithGoogle,
-        logout,
-        setRole,
-        updateProfile,
-        buyItem,
-      }}
-    >
+    <AuthContext.Provider value={{ user, userData, loading, signInWithGoogle, logout, setRole, updateProfile, buyItem }}>
       {children}
     </AuthContext.Provider>
   );

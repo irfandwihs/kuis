@@ -21,6 +21,7 @@ export default function AdminDashboard() {
   const [testResult, setTestResult] = useState<{ success: boolean; message?: string; error?: string } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
   const [classFilter, setClassFilter] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
   const [isResettingAll, setIsResettingAll] = useState(false);
 
   // Hardcoded admin email as requested
@@ -249,13 +250,15 @@ export default function AdminDashboard() {
     const matchesSearch = u.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           u.email?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesClass = classFilter ? u.studentClass === classFilter : true;
-    return matchesSearch && matchesClass;
+    const matchesRole = roleFilter ? u.role === roleFilter : true;
+    return matchesSearch && matchesClass && matchesRole;
   });
 
   const stats = {
     total: allUsers.length,
     guru: allUsers.filter(u => u.role === "Guru").length,
     siswa: allUsers.filter(u => u.role === "Siswa").length,
+    umum: allUsers.filter(u => u.role === "Umum").length,
   };
 
   return (
@@ -278,7 +281,8 @@ export default function AdminDashboard() {
             {[
               { label: "Total Users", value: stats.total, color: "brand-navy" },
               { label: "Guru", value: stats.guru, color: "brand-orange" },
-              { label: "Siswa", value: stats.siswa, color: "sky-500" }
+              { label: "Siswa", value: stats.siswa, color: "sky-500" },
+              { label: "Umum", value: stats.umum, color: "emerald-500" }
             ].map((stat, i) => (
               <div key={i} className="flex-1 md:w-32 bg-white px-5 py-4 rounded-[24px] shadow-sm border border-brand-navy/5 text-center">
                 <div className="text-[9px] font-black text-brand-navy/30 uppercase tracking-widest mb-1">{stat.label}</div>
@@ -300,6 +304,16 @@ export default function AdminDashboard() {
             />
           </div>
           <div className="flex flex-col sm:flex-row gap-4">
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="px-6 py-4 bg-white rounded-2xl border border-brand-navy/5 shadow-sm focus:border-brand-orange outline-none transition-all font-bold text-brand-navy cursor-pointer"
+            >
+              <option value="">Semua Role</option>
+              <option value="Siswa">Siswa</option>
+              <option value="Guru">Guru</option>
+              <option value="Umum">Umum</option>
+            </select>
             <select
               value={classFilter}
               onChange={(e) => setClassFilter(e.target.value)}
@@ -394,6 +408,7 @@ export default function AdminDashboard() {
                   <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border-2 ${
                     user.role === "Guru" ? "bg-brand-orange/5 border-brand-orange text-brand-orange" : 
                     user.role === "Siswa" ? "bg-brand-navy/5 border-brand-navy text-brand-navy" : 
+                    user.role === "Umum" ? "bg-emerald-500/5 border-emerald-500 text-emerald-500" : 
                     "bg-slate-50 border-slate-200 text-slate-400"
                   }`}>
                     {user.role || "Unset"}
@@ -505,6 +520,7 @@ export default function AdminDashboard() {
                         <option value="">Unset</option>
                         <option value="Guru">Guru</option>
                         <option value="Siswa">Siswa</option>
+                        <option value="Umum">Umum</option>
                       </select>
                     </div>
                   </div>

@@ -72,11 +72,12 @@ service cloud.firestore {
       );
     }
 
-    // Fungsi untuk mengecek pemilik dokumen (Guru)
+    // Fungsi untuk mengecek pemilik dokumen (Guru/Host)
     function isOwner(data) {
       return request.auth != null && (
         data.guruId == request.auth.uid || 
         data.teacherId == request.auth.uid ||
+        data.hostId == request.auth.uid ||
         isMaster()
       );
     }
@@ -110,15 +111,25 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create: if request.auth != null && (
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Guru' || 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Siswa' || 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Umum' || 
         isMaster()
       );
-      allow update: if request.auth != null; 
+      allow update: if request.auth != null && (
+        isOwner(resource.data) ||
+        isMaster()
+      );
       allow delete: if isOwner(resource.data);
       
       // Leaderboard di dalam ruangan
       match /leaderboard/{siswaId} {
         allow read: if request.auth != null;
-        allow write: if request.auth != null && (request.auth.uid == siswaId || isMaster());
+        allow write: if request.auth != null && (
+          request.auth.uid == siswaId || 
+          siswaId == 'ai_bot' ||
+          isOwner(get(/databases/$(database)/documents/rooms/$(roomId)).data) ||
+          isMaster()
+        );
         allow delete: if isOwner(get(/databases/$(database)/documents/rooms/$(roomId)).data);
       }
     }

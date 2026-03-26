@@ -7,7 +7,7 @@ import { GraduationCap, BookOpen } from "lucide-react";
 const SUBJECTS = ["Matematika", "IPA", "IPS", "Bahasa Indonesia", "Bahasa Inggris", "Bahasa Jawa", "Pendidikan Kewarganegaraan", "Agama Islam", "Agama Kristen", "Agama Katholik", "Agama Hindu", "Agama Budha", "PJOK", "Informatika", "Koding dan KA", "Seni Budaya", "Prakarya"];
 
 export default function Onboarding() {
-  const { setRole, userData } = useAuth();
+  const { setRole, userData, loading } = useAuth();
   const [selectedRole, setSelectedRole] = useState<Role>(null);
   const [selectedSubject, setSelectedSubject] = useState<string>("");
 
@@ -17,6 +17,10 @@ export default function Onboarding() {
     
     await setRole(selectedRole, selectedRole === "Guru" ? selectedSubject : "");
   };
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen text-slate-500">Memuat...</div>;
+  }
 
   if (userData?.role) {
     return <div className="flex items-center justify-center min-h-screen text-slate-500">Mengalihkan...</div>;

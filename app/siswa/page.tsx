@@ -277,45 +277,55 @@ export default function SiswaDashboard() {
 
   const createRoomWithFriends = async (quizId: string, quizTitle: string) => {
     if (!userData?.uid) return;
-    const roomCode = Math.floor(100000 + Math.random() * 900000).toString();
-    await addDoc(collection(db, "rooms"), {
-      roomCode,
-      quizId,
-      quizTitle,
-      hostId: userData.uid,
-      status: "waiting",
-      targetClass: userData.studentClass || "Semua Kelas",
-      useTimer: useTimer,
-      createdAt: new Date(),
-    });
-    router.push(`/room/siswa/${roomCode}`);
+    try {
+      const roomCode = Math.floor(100000 + Math.random() * 900000).toString();
+      await addDoc(collection(db, "rooms"), {
+        roomCode,
+        quizId,
+        quizTitle,
+        hostId: userData.uid,
+        status: "waiting",
+        targetClass: userData.studentClass || "Semua Kelas",
+        useTimer: useTimer,
+        createdAt: new Date(),
+      });
+      router.push(`/room/siswa/${roomCode}`);
+    } catch (error) {
+      console.error("Error creating room:", error);
+      alert("Gagal membuat ruangan. Pastikan koneksi internet stabil.");
+    }
   };
 
   const createAiRoom = async (quizId: string, quizTitle: string) => {
     if (!userData?.uid) return;
-    const roomCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const roomRef = await addDoc(collection(db, "rooms"), {
-      roomCode,
-      quizId,
-      quizTitle,
-      hostId: userData.uid,
-      status: "playing",
-      mode: "ai",
-      targetClass: userData.studentClass || "Semua Kelas",
-      useTimer: useTimer,
-      createdAt: new Date(),
-    });
-    
-    // Add AI bot to leaderboard
-    await setDoc(doc(db, "rooms", roomRef.id, "leaderboard", "ai_bot"), {
-      siswaName: "🤖 AI Bot",
-      avatar: "bot",
-      score: 0,
-      status: "playing",
-      joinedAt: new Date(),
-    });
+    try {
+      const roomCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const roomRef = await addDoc(collection(db, "rooms"), {
+        roomCode,
+        quizId,
+        quizTitle,
+        hostId: userData.uid,
+        status: "playing",
+        mode: "ai",
+        targetClass: userData.studentClass || "Semua Kelas",
+        useTimer: useTimer,
+        createdAt: new Date(),
+      });
+      
+      // Add AI bot to leaderboard
+      await setDoc(doc(db, "rooms", roomRef.id, "leaderboard", "ai_bot"), {
+        siswaName: "🤖 AI Bot",
+        avatar: "bot",
+        score: 0,
+        status: "playing",
+        joinedAt: new Date(),
+      });
 
-    router.push(`/room/siswa/${roomCode}`);
+      router.push(`/room/siswa/${roomCode}`);
+    } catch (error) {
+      console.error("Error creating AI room:", error);
+      alert("Gagal membuat ruangan AI. Pastikan koneksi internet stabil.");
+    }
   };
 
   const waterTree = async () => {
@@ -421,56 +431,60 @@ export default function SiswaDashboard() {
         </header>
 
         {mainTab === "beranda" && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-            <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center group hover:border-brand-orange transition-all">
-              <div className="p-2 bg-brand-orange/10 text-brand-orange rounded-xl mb-2 group-hover:scale-110 transition-transform">
+          <div className="flex gap-3 mb-6 overflow-x-auto pb-2 no-scrollbar snap-x">
+            <div className="bg-white p-3 rounded-2xl shadow-sm border border-brand-navy/5 flex items-center gap-3 min-w-[140px] snap-start group hover:border-brand-orange transition-all">
+              <div className="p-2 bg-brand-orange/10 text-brand-orange rounded-xl group-hover:scale-110 transition-transform">
                 <Trophy className="w-5 h-5" />
               </div>
-              <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">
-                Peringkat
+              <div>
+                <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-0.5">
+                  Peringkat
+                </div>
+                <div className="text-base font-black text-brand-navy leading-none">{rank}</div>
               </div>
-              <div className="text-lg font-black text-brand-navy">{rank}</div>
             </div>
-            <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center group hover:border-brand-orange transition-all">
-              <div className="p-2 bg-brand-navy/10 text-brand-navy rounded-xl mb-2 group-hover:scale-110 transition-transform">
+            <div className="bg-white p-3 rounded-2xl shadow-sm border border-brand-navy/5 flex items-center gap-3 min-w-[140px] snap-start group hover:border-brand-orange transition-all">
+              <div className="p-2 bg-brand-navy/10 text-brand-navy rounded-xl group-hover:scale-110 transition-transform">
                 <Zap className="w-5 h-5" />
               </div>
-              <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">
-                Total XP
+              <div>
+                <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-0.5">
+                  Total XP
+                </div>
+                <div className="text-base font-black text-brand-navy leading-none">{xp}</div>
               </div>
-              <div className="text-lg font-black text-brand-navy">{xp}</div>
             </div>
-            <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center">
-              <div className="p-2 bg-brand-orange/10 text-brand-orange rounded-xl mb-2">
+            <div className="bg-white p-3 rounded-2xl shadow-sm border border-brand-navy/5 flex items-center gap-3 min-w-[140px] snap-start group hover:border-brand-orange transition-all">
+              <div className="p-2 bg-brand-orange/10 text-brand-orange rounded-xl group-hover:scale-110 transition-transform">
                 <Star className="w-5 h-5" />
               </div>
-              <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">
-                Quiz
-              </div>
-              <div className="text-lg font-black text-brand-navy">
-                {quizzesPlayed}
+              <div>
+                <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-0.5">
+                  Quiz
+                </div>
+                <div className="text-base font-black text-brand-navy leading-none">{quizzesPlayed}</div>
               </div>
             </div>
-            <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center">
-              <div className="p-2 bg-sky-100 text-sky-500 rounded-xl mb-2">
+            <div className="bg-white p-3 rounded-2xl shadow-sm border border-brand-navy/5 flex items-center gap-3 min-w-[140px] snap-start group hover:border-brand-orange transition-all">
+              <div className="p-2 bg-sky-100 text-sky-500 rounded-xl group-hover:scale-110 transition-transform">
                 <Diamond className="w-5 h-5 fill-current" />
               </div>
-              <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">
-                Diamond
-              </div>
-              <div className="text-lg font-black text-brand-navy">
-                {userData.diamonds || 0}
+              <div>
+                <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-0.5">
+                  Diamond
+                </div>
+                <div className="text-base font-black text-brand-navy leading-none">{userData.diamonds || 0}</div>
               </div>
             </div>
-            <div className="bg-white p-4 rounded-3xl shadow-sm border border-brand-navy/5 flex flex-col items-center text-center">
-              <div className="p-2 bg-blue-100 text-blue-500 rounded-xl mb-2">
+            <div className="bg-white p-3 rounded-2xl shadow-sm border border-brand-navy/5 flex items-center gap-3 min-w-[140px] snap-start group hover:border-brand-orange transition-all">
+              <div className="p-2 bg-blue-100 text-blue-500 rounded-xl group-hover:scale-110 transition-transform">
                 <Droplets className="w-5 h-5 fill-current" />
               </div>
-              <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">
-                Air
-              </div>
-              <div className="text-lg font-black text-brand-navy">
-                {userData.water || 0}
+              <div>
+                <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-0.5">
+                  Air
+                </div>
+                <div className="text-base font-black text-brand-navy leading-none">{userData.water || 0}</div>
               </div>
             </div>
           </div>
@@ -743,7 +757,7 @@ export default function SiswaDashboard() {
                 Gabung Kuis
               </h2>
               <p className="text-brand-navy/60 text-sm mb-8 leading-relaxed font-medium">
-                Masukkan 6 digit kode ruangan yang diberikan oleh guru Anda
+                Masukkan 6 digit kode ruangan yang diberikan oleh guru atau teman Anda
                 untuk memulai petualangan!
               </p>
 
