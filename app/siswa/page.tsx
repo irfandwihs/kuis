@@ -89,6 +89,7 @@ export default function SiswaDashboard() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [viewingMaterial, setViewingMaterial] = useState<Material | null>(null);
   const [availableQuizzes, setAvailableQuizzes] = useState<any[]>([]);
+  const [activeRooms, setActiveRooms] = useState<any[]>([]);
   const [useTimer, setUseTimer] = useState(true);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [viewingAssignment, setViewingAssignment] = useState<Assignment | null>(
@@ -157,10 +158,13 @@ export default function SiswaDashboard() {
     const fetchData = async () => {
       if (!userData?.uid) return;
       try {
+        const schoolName = userData.schoolName || "Umum";
+
         // 1. Fetch Global Leaderboard (All Siswa who have earned XP)
         const qLeaderboard = query(
           collection(db, "users"),
           where("role", "==", "Siswa"),
+          where("schoolName", "==", schoolName),
           where("xp", ">", 0),
           orderBy("xp", "desc"),
         );
@@ -178,6 +182,7 @@ export default function SiswaDashboard() {
           const qRank = query(
             collection(db, "users"),
             where("role", "==", "Siswa"),
+            where("schoolName", "==", schoolName),
             where("xp", ">", userData.xp),
           );
           const rankSnapshot = await getCountFromServer(qRank);
@@ -200,6 +205,7 @@ export default function SiswaDashboard() {
         // 4. Fetch Materials
         const qMaterials = query(
           collection(db, "materials"),
+          where("schoolName", "==", schoolName),
           orderBy("order", "asc"),
         );
         const snapshotMaterials = await getDocs(qMaterials);
@@ -212,6 +218,7 @@ export default function SiswaDashboard() {
         if (userData.studentClass) {
           const qAssignments = query(
             collection(db, "assignments"),
+            where("schoolName", "==", schoolName),
             where("targetClass", "in", ["Semua Kelas", userData.studentClass]),
             orderBy("createdAt", "desc"),
           );
@@ -242,6 +249,7 @@ export default function SiswaDashboard() {
         // Fetch Quizzes (Available for all students)
         const qQuizzes = query(
           collection(db, "quizzes"),
+          where("schoolName", "==", schoolName),
           orderBy("createdAt", "desc"),
         );
         const snapshotQuizzes = await getDocs(qQuizzes);
@@ -249,12 +257,34 @@ export default function SiswaDashboard() {
           (doc) => ({ id: doc.id, ...doc.data() })
         );
         setAvailableQuizzes(quizzesData);
+
+        // Listen for active multiplayer rooms
+        const qRooms = query(
+          collection(db, "rooms"),
+          where("status", "==", "waiting"),
+          where("mode", "==", "multiplayer")
+        );
+        const unsubscribeRooms = onSnapshot(qRooms, (snapshot) => {
+          const roomsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          // Filter out rooms that are not for this student's class (if restricted)
+          const filteredRooms = roomsData.filter((room: any) => {
+            return room.targetClass === "Semua Kelas" || room.targetClass === userData?.studentClass;
+          });
+          setActiveRooms(filteredRooms);
+        });
+
+        return () => {
+          unsubscribeRooms();
+        };
       } catch (error) {
         console.error("Error fetching data:", error);
       }
     };
 
-    fetchData();
+    const cleanup = fetchData();
+    return () => {
+      cleanup.then((fn) => fn && fn());
+    };
   }, [
     userData?.uid,
     userData?.xp,
@@ -285,6 +315,7 @@ export default function SiswaDashboard() {
         quizTitle,
         hostId: userData.uid,
         status: "waiting",
+        mode: "multiplayer",
         targetClass: userData.studentClass || "Semua Kelas",
         useTimer: useTimer,
         createdAt: new Date(),
@@ -331,46 +362,49 @@ export default function SiswaDashboard() {
   const waterTree = async () => {
     if (!userData?.uid || (userData.water || 0) < 10) return;
 
-    const newWater = (userData.water || 0) - 10;
-    const newHeight = (userData.treeHeight || 0) + 1;
-
-    const updates: any = {
-      water: newWater,
-      treeHeight: newHeight,
-    };
-
-    // Check for milestones
-    if (newHeight === 10) {
-      updates.xp = (userData.xp || 0) + 50;
-      alert("Selamat! Pohonmu mencapai 10cm! Kamu mendapat 50 XP!");
-    } else if (newHeight === 50) {
-      updates.xp = (userData.xp || 0) + 100;
-      updates.diamonds = (userData.diamonds || 0) + 10;
-      alert(
-        "Selamat! Pohonmu mencapai 50cm! Kamu mendapat 100 XP dan 10 Diamond!",
-      );
-    } else if (newHeight === 100) {
-      updates.xp = (userData.xp || 0) + 200;
-      updates.diamonds = (userData.diamonds || 0) + 20;
-      const inventory = userData.inventory || {};
-      inventory.pohon_dewasa = (inventory.pohon_dewasa || 0) + 1;
-      updates.inventory = inventory;
-      alert(
-        "Selamat! Pohonmu mencapai 100cm! Kamu mendapat 200 XP, 20 Diamond, dan Item Pohon Dewasa!",
-      );
-    } else if (newHeight === 200) {
-      updates.xp = (userData.xp || 0) + 500;
-      updates.diamonds = (userData.diamonds || 0) + 50;
-      const inventory = userData.inventory || {};
-      inventory.pohon_raksasa = (inventory.pohon_raksasa || 0) + 1;
-      updates.inventory = inventory;
-      alert(
-        "Selamat! Pohonmu mencapai 200cm! Kamu mendapat 500 XP, 50 Diamond, dan Item Pohon Raksasa!",
-      );
-    }
-
     try {
-      await updateDoc(doc(db, "users", userData.uid), updates);
+      const userRef = doc(db, "users", userData.uid);
+      const newHeight = (userData.treeHeight || 0) + 1;
+      
+      let bonusXP = 0;
+      let bonusDiamonds = 0;
+      let newItems = { ...userData.inventory };
+      let message = "";
+
+      // Milestone rewards
+      if (newHeight === 10) {
+        bonusXP = 50;
+        message = "Selamat! Pohonmu mencapai 10cm! Kamu mendapat 50 XP!";
+      } else if (newHeight === 50) {
+        bonusXP = 100;
+        bonusDiamonds = 10;
+        message = "Selamat! Pohonmu mencapai 50cm! Kamu mendapat 100 XP dan 10 Diamond!";
+      } else if (newHeight === 100) {
+        bonusXP = 200;
+        bonusDiamonds = 20;
+        newItems["pohon_dewasa"] = (newItems["pohon_dewasa"] || 0) + 1;
+        message = "Selamat! Pohonmu mencapai 100cm! Kamu mendapat 200 XP, 20 Diamond, dan Item Pohon Dewasa!";
+      } else if (newHeight === 200) {
+        bonusXP = 500;
+        bonusDiamonds = 50;
+        newItems["pohon_raksasa"] = (newItems["pohon_raksasa"] || 0) + 1;
+        message = "Selamat! Pohonmu mencapai 200cm! Kamu mendapat 500 XP, 50 Diamond, dan Item Pohon Raksasa!";
+      }
+
+      const updates: any = {
+        water: increment(-10),
+        treeHeight: increment(1),
+      };
+
+      if (bonusXP > 0) updates.xp = increment(bonusXP);
+      if (bonusDiamonds > 0) updates.diamonds = increment(bonusDiamonds);
+      if (Object.keys(newItems).length > 0) updates.inventory = newItems;
+
+      await updateDoc(userRef, updates);
+
+      if (message) {
+        alert(message);
+      }
     } catch (err) {
       console.error("Gagal menyiram pohon:", err);
     }
@@ -781,6 +815,38 @@ export default function SiswaDashboard() {
             </div>
 
             <div className="w-full space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300 delay-100">
+              {activeRooms.length > 0 && (
+                <div className="mb-8">
+                  <div className="flex items-center gap-3 mb-6 px-2">
+                    <Users className="w-6 h-6 text-brand-orange" />
+                    <h2 className="text-xl font-black text-brand-navy tracking-tight">
+                      Ruangan Mabar Tersedia
+                    </h2>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4">
+                    {activeRooms.map((room) => (
+                      <div key={room.id} className="bg-brand-cream/30 p-6 rounded-[32px] shadow-sm border border-brand-orange/20 flex flex-col gap-4 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 bg-brand-orange text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl">
+                          Mabar
+                        </div>
+                        <div>
+                          <h3 className="font-black text-brand-navy text-lg mb-1">{room.quizTitle}</h3>
+                          <p className="text-xs text-brand-navy/60 font-medium">Kode Ruangan: <span className="font-mono font-bold text-brand-orange">{room.roomCode}</span></p>
+                        </div>
+                        <div className="flex gap-3 mt-2">
+                          <button
+                            onClick={() => router.push(`/room/siswa/${room.roomCode}`)}
+                            className="flex-1 bg-brand-orange text-white py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-orange/90 shadow-lg shadow-brand-orange/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                          >
+                            <Play className="w-4 h-4" /> Gabung Mabar
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between mb-6 px-2">
                 <div className="flex items-center gap-3">
                   <Sparkles className="w-6 h-6 text-brand-orange" />

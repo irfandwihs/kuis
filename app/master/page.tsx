@@ -376,10 +376,11 @@ export default function AdminDashboard() {
         <div className="bg-white rounded-[40px] shadow-2xl shadow-brand-navy/5 border border-brand-navy/5 overflow-hidden">
           {/* Table Header - Hidden on mobile */}
           <div className="hidden md:grid grid-cols-12 gap-4 p-6 bg-brand-navy text-white/40 text-[9px] font-black uppercase tracking-widest">
-            <div className="col-span-4">User Profile</div>
+            <div className="col-span-3">User Profile</div>
             <div className="col-span-2">Role</div>
+            <div className="col-span-2">School</div>
             <div className="col-span-2 text-center">Performance</div>
-            <div className="col-span-2 text-center">Economy</div>
+            <div className="col-span-1 text-center">Economy</div>
             <div className="col-span-2 text-right">Actions</div>
           </div>
           
@@ -393,7 +394,7 @@ export default function AdminDashboard() {
                 key={user.id} 
                 className="flex flex-col md:grid md:grid-cols-12 gap-4 p-6 hover:bg-brand-cream/30 transition-colors group relative"
               >
-                <div className="md:col-span-4 flex items-center gap-4">
+                <div className="md:col-span-3 flex items-center gap-4">
                   <Avatar avatarString={user.avatar} size="md" className="shadow-md group-hover:scale-110 transition-transform" />
                   <div className="overflow-hidden">
                     <div className="font-black text-brand-navy truncate text-sm md:text-base">{user.displayName || "Anonymous"}</div>
@@ -414,6 +415,13 @@ export default function AdminDashboard() {
                     {user.role || "Unset"}
                   </span>
                 </div>
+
+                <div className="md:col-span-2 flex items-center justify-between md:justify-start">
+                  <span className="md:hidden text-[9px] font-black text-brand-navy/40 uppercase tracking-widest">School:</span>
+                  <span className="font-bold text-brand-navy/60 text-sm truncate" title={user.schoolName || "Umum"}>
+                    {user.schoolName || "Umum"}
+                  </span>
+                </div>
                 
                 <div className="md:col-span-2 flex items-center justify-between md:justify-center">
                   <span className="md:hidden text-[9px] font-black text-brand-navy/40 uppercase tracking-widest">Performance:</span>
@@ -427,7 +435,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 
-                <div className="md:col-span-2 flex items-center justify-between md:justify-center">
+                <div className="md:col-span-1 flex items-center justify-between md:justify-center">
                   <span className="md:hidden text-[9px] font-black text-brand-navy/40 uppercase tracking-widest">Economy:</span>
                   <div className="flex flex-col items-end md:items-center">
                     <div className="flex items-center justify-center gap-1 text-sky-500 font-black text-sm">
@@ -554,6 +562,19 @@ export default function AdminDashboard() {
                       onChange={e => setEditingUser({
                         ...editingUser, 
                         [editingUser.role === "Guru" ? "subject" : "studentClass"]: e.target.value
+                      })}
+                      className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange outline-none transition-all font-bold text-brand-navy"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">School Name</label>
+                    <input 
+                      type="text"
+                      value={editingUser.schoolName || ""}
+                      onChange={e => setEditingUser({
+                        ...editingUser, 
+                        schoolName: e.target.value
                       })}
                       className="w-full p-4 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange outline-none transition-all font-bold text-brand-navy"
                     />

@@ -10,12 +10,14 @@ export default function Onboarding() {
   const { setRole, userData, loading } = useAuth();
   const [selectedRole, setSelectedRole] = useState<Role>(null);
   const [selectedSubject, setSelectedSubject] = useState<string>("");
+  const [schoolName, setSchoolName] = useState<string>("");
 
   const handleComplete = async () => {
     if (!selectedRole) return;
     if (selectedRole === "Guru" && !selectedSubject) return;
+    if (!schoolName.trim()) return;
     
-    await setRole(selectedRole, selectedRole === "Guru" ? selectedSubject : "");
+    await setRole(selectedRole, selectedRole === "Guru" ? selectedSubject : "", schoolName.trim());
   };
 
   if (loading) {
@@ -65,27 +67,47 @@ export default function Onboarding() {
             </button>
           </div>
 
-          {selectedRole === "Guru" && (
-            <div className="mb-8 md:mb-12 animate-in fade-in slide-in-from-bottom-4">
-              <label className="block text-xs font-black text-brand-navy/40 uppercase tracking-widest mb-3 ml-1">
-                Pilih Mata Pelajaran Anda
-              </label>
-              <select
-                value={selectedSubject}
-                onChange={(e) => setSelectedSubject(e.target.value)}
-                className="w-full p-5 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none text-brand-navy font-bold transition-all appearance-none"
-              >
-                <option value="" disabled>Pilih mata pelajaran...</option>
-                {SUBJECTS.map((subject) => (
-                  <option key={subject} value={subject}>{subject}</option>
-                ))}
-              </select>
+          {selectedRole && (
+            <div className="mb-8 md:mb-12 animate-in fade-in slide-in-from-bottom-4 space-y-6">
+              {selectedRole === "Guru" && (
+                <div>
+                  <label className="block text-xs font-black text-brand-navy/40 uppercase tracking-widest mb-3 ml-1">
+                    Pilih Mata Pelajaran Anda
+                  </label>
+                  <select
+                    value={selectedSubject}
+                    onChange={(e) => setSelectedSubject(e.target.value)}
+                    className="w-full p-5 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none text-brand-navy font-bold transition-all appearance-none"
+                  >
+                    <option value="" disabled>Pilih mata pelajaran...</option>
+                    {SUBJECTS.map((subject) => (
+                      <option key={subject} value={subject}>{subject}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              
+              <div>
+                <label className="block text-xs font-black text-brand-navy/40 uppercase tracking-widest mb-3 ml-1">
+                  Nama Sekolah / Organisasi
+                </label>
+                <input
+                  type="text"
+                  value={schoolName}
+                  onChange={(e) => setSchoolName(e.target.value)}
+                  placeholder="Contoh: SMAN 1 Jakarta (atau 'Umum')"
+                  className="w-full p-5 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none text-brand-navy font-bold transition-all"
+                />
+                <p className="text-[10px] text-brand-navy/40 mt-2 ml-1 font-medium">
+                  Pastikan nama sekolah sama dengan pengguna lain di sekolah Anda agar dapat terhubung.
+                </p>
+              </div>
             </div>
           )}
 
           <button
             onClick={handleComplete}
-            disabled={!selectedRole || (selectedRole === "Guru" && !selectedSubject)}
+            disabled={!selectedRole || (selectedRole === "Guru" && !selectedSubject) || !schoolName.trim()}
             className="w-full bg-brand-navy text-white font-black text-xl py-5 rounded-3xl hover:bg-brand-black transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-brand-navy/20 active:scale-95"
           >
             Selesaikan Pengaturan

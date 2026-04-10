@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
-import { doc, getDoc, setDoc, updateDoc, increment } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, increment, onSnapshot } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { useRouter, usePathname } from "next/navigation";
 
@@ -19,6 +19,7 @@ interface UserData {
   avatar?: string;
   studentClass?: string;
   studentAbsen?: string;
+  schoolName?: string;
   profileCompleted?: boolean;
   diamonds?: number;
   inventory?: Record<string, number>;
@@ -30,7 +31,7 @@ interface AuthContextType {
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
-  setRole: (role: Role, subjectOrClass?: string) => Promise<void>;
+  setRole: (role: Role, subjectOrClass?: string, schoolName?: string) => Promise<void>;
   updateProfile: (data: Partial<UserData>) => Promise<void>;
   buyItem: (itemId: string, price: number) => Promise<void>;
 }
@@ -45,59 +46,68 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    let unsubscribeUserDoc: () => void;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
         const userDocRef = doc(db, "users", currentUser.uid);
-        const userDoc = await getDoc(userDocRef);
         
-        if (userDoc.exists()) {
-          const data = userDoc.data() as UserData;
-          setUserData(data);
-          
-          if (!data.role && pathname !== "/onboarding") {
-            router.push("/onboarding");
-          } else if (data.role) {
-            const isSiswaRoute = pathname.startsWith("/siswa") || pathname.startsWith("/room/siswa");
-            const isGuruRoute = pathname.startsWith("/guru") || pathname.startsWith("/room/guru");
+        unsubscribeUserDoc = onSnapshot(userDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data() as UserData;
+            setUserData(data);
+            
+            if (!data.role && pathname !== "/onboarding") {
+              router.push("/onboarding");
+            } else if (data.role) {
+              const isSiswaRoute = pathname.startsWith("/siswa") || pathname.startsWith("/room/siswa");
+              const isGuruRoute = pathname.startsWith("/guru") || pathname.startsWith("/room/guru");
 
-            if (data.role === "Guru" && isSiswaRoute) {
-              router.push("/guru");
-            } else if (data.role === "Siswa" && isGuruRoute) {
-              router.push("/siswa");
-            } else if (pathname === "/" || pathname === "/onboarding") {
-              router.push(data.role === "Guru" ? "/guru" : "/siswa");
+              if (data.role === "Guru" && isSiswaRoute) {
+                router.push("/guru");
+              } else if (data.role === "Siswa" && isGuruRoute) {
+                router.push("/siswa");
+              } else if (pathname === "/" || pathname === "/onboarding") {
+                router.push(data.role === "Guru" ? "/guru" : "/siswa");
+              }
+            }
+          } else {
+            // New user, create empty doc
+            const newUserData: UserData = {
+              uid: currentUser.uid,
+              email: currentUser.email,
+              displayName: currentUser.displayName,
+              role: null,
+              xp: 0,
+              diamonds: 0,
+              quizzesPlayed: 0,
+              avatar: "0",
+              inventory: {}
+            };
+            setDoc(userDocRef, newUserData);
+            setUserData(newUserData);
+            if (pathname !== "/onboarding") {
+              router.push("/onboarding");
             }
           }
-        } else {
-          // New user, create empty doc
-          const newUserData: UserData = {
-            uid: currentUser.uid,
-            email: currentUser.email,
-            displayName: currentUser.displayName,
-            role: null,
-            xp: 0,
-            diamonds: 0,
-            quizzesPlayed: 0,
-            avatar: "0",
-            inventory: {}
-          };
-          await setDoc(userDocRef, newUserData);
-          setUserData(newUserData);
-          if (pathname !== "/onboarding") {
-            router.push("/onboarding");
-          }
-        }
+          setLoading(false);
+        });
       } else {
         setUserData(null);
+        setLoading(false);
         if (pathname !== "/") {
           router.push("/");
         }
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeUserDoc) {
+        unsubscribeUserDoc();
+      }
+    };
   }, [router, pathname]);
 
   const signInWithGoogle = async () => {
@@ -117,7 +127,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const setRole = async (role: Role, subjectOrClass?: string) => {
+  const setRole = async (role: Role, subjectOrClass?: string, schoolName?: string) => {
     if (!user) return;
     const userDocRef = doc(db, "users", user.uid);
     const updatedData: Partial<UserData> = { role };
@@ -125,6 +135,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       updatedData.subject = subjectOrClass;
     } else if (role === "Siswa" && subjectOrClass) {
       updatedData.studentClass = subjectOrClass;
+    }
+    if (schoolName) {
+      updatedData.schoolName = schoolName;
     }
     await setDoc(userDocRef, updatedData, { merge: true });
     setUserData((prev) => prev ? { ...prev, ...updatedData } : null);
