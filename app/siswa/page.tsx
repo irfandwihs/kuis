@@ -46,6 +46,7 @@ import {
   setDoc,
   getDoc,
   addDoc,
+  onSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import StudentOnboardingModal from "@/components/StudentOnboardingModal";
@@ -253,22 +254,29 @@ export default function SiswaDashboard() {
           orderBy("createdAt", "desc"),
         );
         const snapshotQuizzes = await getDocs(qQuizzes);
-        const quizzesData = snapshotQuizzes.docs.map(
-          (doc) => ({ id: doc.id, ...doc.data() })
-        );
+        const quizzesData = snapshotQuizzes.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
         setAvailableQuizzes(quizzesData);
 
         // Listen for active multiplayer rooms
         const qRooms = query(
           collection(db, "rooms"),
           where("status", "==", "waiting"),
-          where("mode", "==", "multiplayer")
+          where("mode", "==", "multiplayer"),
         );
         const unsubscribeRooms = onSnapshot(qRooms, (snapshot) => {
-          const roomsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          const roomsData = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
           // Filter out rooms that are not for this student's class (if restricted)
           const filteredRooms = roomsData.filter((room: any) => {
-            return room.targetClass === "Semua Kelas" || room.targetClass === userData?.studentClass;
+            return (
+              room.targetClass === "Semua Kelas" ||
+              room.targetClass === userData?.studentClass
+            );
           });
           setActiveRooms(filteredRooms);
         });
@@ -342,7 +350,7 @@ export default function SiswaDashboard() {
         useTimer: useTimer,
         createdAt: new Date(),
       });
-      
+
       // Add AI bot to leaderboard
       await setDoc(doc(db, "rooms", roomRef.id, "leaderboard", "ai_bot"), {
         siswaName: "🤖 AI Bot",
@@ -365,7 +373,7 @@ export default function SiswaDashboard() {
     try {
       const userRef = doc(db, "users", userData.uid);
       const newHeight = (userData.treeHeight || 0) + 1;
-      
+
       let bonusXP = 0;
       let bonusDiamonds = 0;
       let newItems = { ...userData.inventory };
@@ -378,17 +386,20 @@ export default function SiswaDashboard() {
       } else if (newHeight === 50) {
         bonusXP = 100;
         bonusDiamonds = 10;
-        message = "Selamat! Pohonmu mencapai 50cm! Kamu mendapat 100 XP dan 10 Diamond!";
+        message =
+          "Selamat! Pohonmu mencapai 50cm! Kamu mendapat 100 XP dan 10 Diamond!";
       } else if (newHeight === 100) {
         bonusXP = 200;
         bonusDiamonds = 20;
         newItems["pohon_dewasa"] = (newItems["pohon_dewasa"] || 0) + 1;
-        message = "Selamat! Pohonmu mencapai 100cm! Kamu mendapat 200 XP, 20 Diamond, dan Item Pohon Dewasa!";
+        message =
+          "Selamat! Pohonmu mencapai 100cm! Kamu mendapat 200 XP, 20 Diamond, dan Item Pohon Dewasa!";
       } else if (newHeight === 200) {
         bonusXP = 500;
         bonusDiamonds = 50;
         newItems["pohon_raksasa"] = (newItems["pohon_raksasa"] || 0) + 1;
-        message = "Selamat! Pohonmu mencapai 200cm! Kamu mendapat 500 XP, 50 Diamond, dan Item Pohon Raksasa!";
+        message =
+          "Selamat! Pohonmu mencapai 200cm! Kamu mendapat 500 XP, 50 Diamond, dan Item Pohon Raksasa!";
       }
 
       const updates: any = {
@@ -474,7 +485,9 @@ export default function SiswaDashboard() {
                 <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-0.5">
                   Peringkat
                 </div>
-                <div className="text-base font-black text-brand-navy leading-none">{rank}</div>
+                <div className="text-base font-black text-brand-navy leading-none">
+                  {rank}
+                </div>
               </div>
             </div>
             <div className="bg-white p-3 rounded-2xl shadow-sm border border-brand-navy/5 flex items-center gap-3 min-w-[140px] snap-start group hover:border-brand-orange transition-all">
@@ -485,7 +498,9 @@ export default function SiswaDashboard() {
                 <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-0.5">
                   Total XP
                 </div>
-                <div className="text-base font-black text-brand-navy leading-none">{xp}</div>
+                <div className="text-base font-black text-brand-navy leading-none">
+                  {xp}
+                </div>
               </div>
             </div>
             <div className="bg-white p-3 rounded-2xl shadow-sm border border-brand-navy/5 flex items-center gap-3 min-w-[140px] snap-start group hover:border-brand-orange transition-all">
@@ -496,7 +511,9 @@ export default function SiswaDashboard() {
                 <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-0.5">
                   Quiz
                 </div>
-                <div className="text-base font-black text-brand-navy leading-none">{quizzesPlayed}</div>
+                <div className="text-base font-black text-brand-navy leading-none">
+                  {quizzesPlayed}
+                </div>
               </div>
             </div>
             <div className="bg-white p-3 rounded-2xl shadow-sm border border-brand-navy/5 flex items-center gap-3 min-w-[140px] snap-start group hover:border-brand-orange transition-all">
@@ -507,7 +524,9 @@ export default function SiswaDashboard() {
                 <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-0.5">
                   Diamond
                 </div>
-                <div className="text-base font-black text-brand-navy leading-none">{userData.diamonds || 0}</div>
+                <div className="text-base font-black text-brand-navy leading-none">
+                  {userData.diamonds || 0}
+                </div>
               </div>
             </div>
             <div className="bg-white p-3 rounded-2xl shadow-sm border border-brand-navy/5 flex items-center gap-3 min-w-[140px] snap-start group hover:border-brand-orange transition-all">
@@ -518,7 +537,9 @@ export default function SiswaDashboard() {
                 <div className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-0.5">
                   Air
                 </div>
-                <div className="text-base font-black text-brand-navy leading-none">{userData.water || 0}</div>
+                <div className="text-base font-black text-brand-navy leading-none">
+                  {userData.water || 0}
+                </div>
               </div>
             </div>
           </div>
@@ -791,8 +812,8 @@ export default function SiswaDashboard() {
                 Gabung Kuis
               </h2>
               <p className="text-brand-navy/60 text-sm mb-8 leading-relaxed font-medium">
-                Masukkan 6 digit kode ruangan yang diberikan oleh guru atau teman Anda
-                untuk memulai petualangan!
+                Masukkan 6 digit kode ruangan yang diberikan oleh guru atau
+                teman Anda untuk memulai petualangan!
               </p>
 
               <form onSubmit={joinRoom} className="space-y-6">
@@ -825,17 +846,29 @@ export default function SiswaDashboard() {
                   </div>
                   <div className="grid grid-cols-1 gap-4">
                     {activeRooms.map((room) => (
-                      <div key={room.id} className="bg-brand-cream/30 p-6 rounded-[32px] shadow-sm border border-brand-orange/20 flex flex-col gap-4 relative overflow-hidden">
+                      <div
+                        key={room.id}
+                        className="bg-brand-cream/30 p-6 rounded-[32px] shadow-sm border border-brand-orange/20 flex flex-col gap-4 relative overflow-hidden"
+                      >
                         <div className="absolute top-0 right-0 bg-brand-orange text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl">
                           Mabar
                         </div>
                         <div>
-                          <h3 className="font-black text-brand-navy text-lg mb-1">{room.quizTitle}</h3>
-                          <p className="text-xs text-brand-navy/60 font-medium">Kode Ruangan: <span className="font-mono font-bold text-brand-orange">{room.roomCode}</span></p>
+                          <h3 className="font-black text-brand-navy text-lg mb-1">
+                            {room.quizTitle}
+                          </h3>
+                          <p className="text-xs text-brand-navy/60 font-medium">
+                            Kode Ruangan:{" "}
+                            <span className="font-mono font-bold text-brand-orange">
+                              {room.roomCode}
+                            </span>
+                          </p>
                         </div>
                         <div className="flex gap-3 mt-2">
                           <button
-                            onClick={() => router.push(`/room/siswa/${room.roomCode}`)}
+                            onClick={() =>
+                              router.push(`/room/siswa/${room.roomCode}`)
+                            }
                             className="flex-1 bg-brand-orange text-white py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-orange/90 shadow-lg shadow-brand-orange/20 transition-all active:scale-95 flex items-center justify-center gap-2"
                           >
                             <Play className="w-4 h-4" /> Gabung Mabar
@@ -854,10 +887,12 @@ export default function SiswaDashboard() {
                     Kuis Tersedia
                   </h2>
                 </div>
-                
+
                 <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-brand-navy/5 shadow-sm">
                   <Timer className="w-4 h-4 text-brand-navy/60" />
-                  <span className="text-sm font-bold text-brand-navy">Gunakan Timer</span>
+                  <span className="text-sm font-bold text-brand-navy">
+                    Gunakan Timer
+                  </span>
                   <button
                     onClick={() => setUseTimer(!useTimer)}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
@@ -882,14 +917,23 @@ export default function SiswaDashboard() {
               ) : (
                 <div className="grid grid-cols-1 gap-4">
                   {availableQuizzes.map((quiz) => (
-                    <div key={quiz.id} className="bg-white p-6 rounded-[32px] shadow-sm border border-brand-navy/5 flex flex-col gap-4">
+                    <div
+                      key={quiz.id}
+                      className="bg-white p-6 rounded-[32px] shadow-sm border border-brand-navy/5 flex flex-col gap-4"
+                    >
                       <div>
-                        <h3 className="font-black text-brand-navy text-lg mb-1">{quiz.title}</h3>
-                        <p className="text-xs text-brand-navy/60 font-medium">{quiz.description || "Tidak ada deskripsi"}</p>
+                        <h3 className="font-black text-brand-navy text-lg mb-1">
+                          {quiz.title}
+                        </h3>
+                        <p className="text-xs text-brand-navy/60 font-medium">
+                          {quiz.description || "Tidak ada deskripsi"}
+                        </p>
                       </div>
                       <div className="flex gap-3 mt-2">
                         <button
-                          onClick={() => createRoomWithFriends(quiz.id, quiz.title)}
+                          onClick={() =>
+                            createRoomWithFriends(quiz.id, quiz.title)
+                          }
                           className="flex-1 bg-brand-cream text-brand-navy py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-navy/5 transition-colors flex items-center justify-center gap-2"
                         >
                           <Users className="w-4 h-4" /> Mabar
