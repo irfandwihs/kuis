@@ -47,6 +47,7 @@ import {
   getDoc,
   addDoc,
   onSnapshot,
+  increment,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import StudentOnboardingModal from "@/components/StudentOnboardingModal";
