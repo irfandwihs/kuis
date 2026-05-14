@@ -64,6 +64,8 @@ interface Quiz {
   questions: any[];
   quizType?: string;
   hiddenWord?: string;
+  guruId?: string;
+  schoolName?: string;
 }
 
 interface Room {
@@ -74,6 +76,7 @@ interface Room {
   quizTitle?: string;
   targetClass?: string;
   createdAt: any;
+  guruId?: string;
 }
 
 interface Material {

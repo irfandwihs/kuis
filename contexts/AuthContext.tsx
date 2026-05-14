@@ -14,6 +14,11 @@ import {
   updateDoc,
   increment,
   onSnapshot,
+  query,
+  collection,
+  where,
+  getDocs,
+  deleteDoc,
 } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { useRouter, usePathname } from "next/navigation";
