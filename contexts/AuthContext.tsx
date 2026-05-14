@@ -95,22 +95,71 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               }
             }
           } else {
-            // New user, create empty doc
-            const newUserData: UserData = {
-              uid: currentUser.uid,
-              email: currentUser.email,
-              displayName: currentUser.displayName,
-              role: null,
-              xp: 0,
-              diamonds: 0,
-              quizzesPlayed: 0,
-              avatar: "0",
-              inventory: {},
-            };
-            setDoc(userDocRef, newUserData);
-            setUserData(newUserData);
-            if (pathname !== "/onboarding") {
-              router.push("/onboarding");
+            // Document doesn't exist for this UID. Let's check if the email exists under a different random ID
+            // (e.g. manually added by admin before the user logged in for the first time)
+            if (currentUser.email) {
+              const q = query(collection(db, "users"), where("email", "==", currentUser.email));
+              getDocs(q).then((snap) => {
+                let existingData: any = null;
+                let oldDocId: string | null = null;
+                
+                if (!snap.empty) {
+                  // Found pre-existing document for this email
+                  existingData = snap.docs[0].data();
+                  oldDocId = snap.docs[0].id;
+                }
+
+                const newUserData: UserData = {
+                  uid: currentUser.uid,
+                  email: currentUser.email,
+                  displayName: existingData?.displayName || currentUser.displayName,
+                  role: existingData?.role || null,
+                  subject: existingData?.subject || undefined,
+                  schoolName: existingData?.schoolName || undefined,
+                  xp: existingData?.xp || 0,
+                  diamonds: existingData?.diamonds || 0,
+                  quizzesPlayed: existingData?.quizzesPlayed || 0,
+                  avatar: existingData?.avatar || "0",
+                  inventory: existingData?.inventory || {},
+                };
+
+                // Save to the new correct UID document
+                setDoc(userDocRef, newUserData).then(() => {
+                  // Delete the old orphan document if it existed
+                  if (oldDocId) {
+                    deleteDoc(doc(db, "users", oldDocId)).catch(console.error);
+                    // We should also theoretically update rooms/quizzes guruId here, 
+                    // but usually pre-registered accounts haven't created content yet.
+                  }
+                });
+
+                setUserData(newUserData);
+                if (!newUserData.role && pathname !== "/onboarding") {
+                  router.push("/onboarding");
+                } else if (newUserData.role && pathname === "/") {
+                  router.push(newUserData.role === "Guru" ? "/guru" : "/siswa");
+                }
+              }).catch(err => {
+                console.error("Error finding duplicate accounts:", err);
+              });
+            } else {
+               // Fallback if no email (e.g. anonymous)
+               const newUserData: UserData = {
+                uid: currentUser.uid,
+                email: currentUser.email,
+                displayName: currentUser.displayName,
+                role: null,
+                xp: 0,
+                diamonds: 0,
+                quizzesPlayed: 0,
+                avatar: "0",
+                inventory: {},
+              };
+              setDoc(userDocRef, newUserData);
+              setUserData(newUserData);
+              if (pathname !== "/onboarding") {
+                router.push("/onboarding");
+              }
             }
           }
           setLoading(false);

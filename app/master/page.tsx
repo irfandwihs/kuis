@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { collection, getDocs, query, orderBy, doc, updateDoc, deleteDoc, setDoc, where, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { ShieldCheck, Mail, Star, Diamond, Users, BookOpen, Trash2, Edit3, RotateCcw, X, Save, Search } from "lucide-react";
+import { ShieldCheck, Mail, Star, Diamond, Users, BookOpen, Trash2, Edit3, RotateCcw, X, Save, Search, Database } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -23,6 +23,7 @@ export default function AdminDashboard() {
   const [classFilter, setClassFilter] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [isResettingAll, setIsResettingAll] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
 
   // Hardcoded admin email as requested
   const ADMIN_EMAIL = "irfandwi.hs@gmail.com";
@@ -171,6 +172,49 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error("Error resetting user:", error);
       alert("Gagal mereset user.");
+    }
+  };
+
+  const handleMigrateDatabase = async () => {
+    if (!confirm("Apakah Anda yakin ingin menambahkan schoolName 'SMPN 1 Wedi' ke SEMUA data (users, quizzes, rooms, materials, assignments) yang belum memilikinya?")) return;
+    
+    setIsMigrating(true);
+    try {
+      const collectionsToMigrate = ["users", "quizzes", "rooms", "materials", "assignments"];
+      let migratedCount = 0;
+      
+      for (const collName of collectionsToMigrate) {
+        const collRef = collection(db, collName);
+        const snapshot = await getDocs(collRef);
+        
+        const chunkSize = 400;
+        for (let i = 0; i < snapshot.docs.length; i += chunkSize) {
+          const chunk = snapshot.docs.slice(i, i + chunkSize);
+          const currentBatch = writeBatch(db);
+          let hasUpdates = false;
+
+          chunk.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (!data.schoolName || data.schoolName === "") {
+               currentBatch.update(docSnap.ref, { schoolName: "SMPN 1 Wedi" });
+               hasUpdates = true;
+               migratedCount++;
+            }
+          });
+
+          if (hasUpdates) {
+             await currentBatch.commit();
+          }
+        }
+      }
+      
+      alert(`Migrasi berhasil! ${migratedCount} dokumen telah diupdate dengan schoolName 'SMPN 1 Wedi'.`);
+      fetchAllUsers();
+    } catch (error) {
+      console.error("Error migrating database:", error);
+      alert("Terjadi kesalahan saat migrasi database.");
+    } finally {
+      setIsMigrating(false);
     }
   };
 
@@ -324,6 +368,14 @@ export default function AdminDashboard() {
                 <option key={cls as string} value={cls as string}>{cls as string}</option>
               ))}
             </select>
+            <button
+              onClick={handleMigrateDatabase}
+              disabled={isMigrating}
+              className="px-6 py-4 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-2 disabled:opacity-50 whitespace-nowrap"
+            >
+              <Database className={`w-5 h-5 ${isMigrating ? "animate-pulse" : ""}`} />
+              {isMigrating ? "Migrasi..." : "Migrasi SMPN 1 Wedi"}
+            </button>
             <button
               onClick={handleResetAllStudents}
               disabled={isResettingAll}

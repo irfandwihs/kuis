@@ -8,59 +8,8 @@ service cloud.firestore {
     //
     // Collection: users
     // Fields:
-    //   - displayName: string
-    //   - email: string
-    //   - role: string ('Guru', 'Siswa', 'Umum')
-    //   - avatar: string
-    //   - xp: number
-    //   - diamonds: number
-    //   - water: number
-    //   - treeHeight: number
-    //   - inventory: map
-    //   - studentClass: string
-    //   - studentAbsen: string
-    //
-    // Collection: quizzes
-    // Fields:
-    //   - guruId: string (UID)
-    //   - subject: string
-    //   - title: string
-    //   - questions: array
-    //   - quizType: string
-    //   - createdAt: timestamp
-    //
-    // Collection: rooms
-    // Fields:
-    //   - roomCode: string
-    //   - quizId: string
-    //   - quizTitle: string
-    //   - guruId: string (UID)
-    //   - status: string ('waiting', 'playing', 'finished')
-    //   - targetClass: string
-    //   - createdAt: timestamp
-    //
-    // Collection: materials
-    // Fields:
-    //   - guruId: string (UID)
-    //   - subject: string
-    //   - title: string
-    //   - description: string
-    //   - content: string
-    //   - fileUrl: string
-    //   - fileName: string
-    //   - order: number
-    //   - createdAt: timestamp
-    //
-    // Collection: assignments (Tugas)
-    // Fields:
-    //   - guruId: string (UID)
-    //   - subject: string
-    //   - title: string
-    //   - description: string
-    //   - content: string
-    //   - deadline: timestamp
-    //   - targetClass: string
-    //   - createdAt: timestamp
+    // ...
+    //   - schoolName: string
     //
     // ===============================================================
 
@@ -81,7 +30,7 @@ service cloud.firestore {
     // Fungsi untuk mengecek apakah data berada di sekolah yang sama
     function isSameSchool(data) {
       let dataSchool = 'schoolName' in data ? data.schoolName : 'Umum';
-      return getUserSchool() == dataSchool || isMaster();
+      return getUserSchool() == dataSchool;
     }
 
     // Fungsi untuk mengecek pemilik dokumen (Guru/Host)
@@ -96,11 +45,11 @@ service cloud.firestore {
 
     // Koleksi Pengguna (Guru/Siswa)
     match /users/{userId} {
-      // User bisa membaca data user lain yang satu sekolah
-      allow read: if request.auth != null && isSameSchool(resource.data);
+      // User bisa membaca data user lain yang satu sekolah, atau akun mana pun yang emailnya sama dengan email loginnya
+      allow read: if isMaster() || (request.auth != null && (isSameSchool(resource.data) || (resource.data.email == request.auth.token.email)));
       allow create: if request.auth != null && (request.auth.uid == userId || isMaster());
-      allow update: if request.auth != null && (request.auth.uid == userId || isMaster());
-      allow delete: if isMaster();
+      allow update: if request.auth != null && (request.auth.uid == userId || isMaster() || (resource.data.email == request.auth.token.email));
+      allow delete: if isMaster() || (request.auth != null && resource.data.email == request.auth.token.email);
 
       // Sub-koleksi Riwayat (History)
       match /history/{historyId} {
@@ -111,7 +60,7 @@ service cloud.firestore {
     
     // Koleksi Kuis
     match /quizzes/{quizId} {
-      allow read: if request.auth != null && (isSameSchool(resource.data) || isOwner(resource.data));
+      allow read: if isMaster() || (request.auth != null && (isSameSchool(resource.data) || isOwner(resource.data)));
       allow create: if request.auth != null && (
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Guru' || 
         isMaster()
@@ -121,7 +70,7 @@ service cloud.firestore {
 
     // Koleksi Ruangan (Rooms)
     match /rooms/{roomId} {
-      allow read: if request.auth != null && (isSameSchool(resource.data) || isOwner(resource.data));
+      allow read: if isMaster() || (request.auth != null && (isSameSchool(resource.data) || isOwner(resource.data)));
       allow create: if request.auth != null && (
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Guru' || 
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Siswa' || 
@@ -149,7 +98,7 @@ service cloud.firestore {
 
     // Koleksi Materi (Materials)
     match /materials/{materialId} {
-      allow read: if request.auth != null && (isSameSchool(resource.data) || isOwner(resource.data));
+      allow read: if isMaster() || (request.auth != null && (isSameSchool(resource.data) || isOwner(resource.data)));
       allow create: if request.auth != null && (
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Guru' || 
         isMaster()
@@ -160,7 +109,7 @@ service cloud.firestore {
     // --- KOLEKSI TUGAS (ASSIGNMENTS) ---
     match /assignments/{assignmentId} {
       // Siswa dan guru yang login bisa membaca tugas di sekolah yang sama
-      allow read: if request.auth != null && (isSameSchool(resource.data) || isOwner(resource.data));
+      allow read: if isMaster() || (request.auth != null && (isSameSchool(resource.data) || isOwner(resource.data)));
       
       // Hanya Guru atau Master yang bisa membuat tugas
       allow create: if request.auth != null && (
@@ -173,22 +122,16 @@ service cloud.firestore {
 
       // Sub-koleksi Pengumpulan (Submissions)
       match /submissions/{submissionId} {
-        // Guru pembuat tugas atau Master bisa membaca semua pengumpulan
-        // Siswa hanya bisa membaca pengumpulannya sendiri
-        allow read: if request.auth != null && (
+        allow read: if isMaster() || (request.auth != null && (
           isOwner(get(/databases/$(database)/documents/assignments/$(assignmentId)).data) ||
-          request.auth.uid == submissionId ||
-          isMaster()
-        );
+          request.auth.uid == submissionId
+        ));
         
-        // Siswa bisa membuat/mengupdate pengumpulannya sendiri
-        // Master bisa melakukan apa saja
         allow create, update: if request.auth != null && (
           request.auth.uid == submissionId || 
           isMaster()
         );
 
-        // Hanya Master atau Guru pembuat tugas yang bisa menghapus pengumpulan
         allow delete: if isMaster() || isOwner(get(/databases/$(database)/documents/assignments/$(assignmentId)).data);
       }
     }

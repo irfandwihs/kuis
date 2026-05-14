@@ -5,3 +5,15 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Firebase credentials & sensitive files
+*.json
+!package.json
+!package-lock.json
+!next.config.ts
+!tsconfig.json
+!eslint.config.mjs
+!postcss.config.mjs
+!firestore.rules
+source_key.json
+repo_clone/

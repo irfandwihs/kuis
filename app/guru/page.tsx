@@ -35,6 +35,7 @@ import {
   BarChart2,
   TrendingUp,
   PieChart as PieChartIcon,
+  Settings,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
@@ -113,14 +114,20 @@ export default function GuruDashboard() {
   const [quizType, setQuizType] = useState<
     "multiple_choice" | "true_false" | "duck_hunt" | "hidden_word" | "mixed_1" | "mixed_2"
   >("multiple_choice");
+  const [aiQuizSubjectType, setAiQuizSubjectType] = useState<"mapel" | "lainnya">("mapel");
   const [viewingQuiz, setViewingQuiz] = useState<Quiz | null>(null);
   const [selectedClass, setSelectedClass] = useState<string>("Semua Kelas");
   const [availableClasses, setAvailableClasses] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchClasses = async () => {
+      if (!userData?.schoolName) return;
       try {
-        const q = query(collection(db, "users"), where("role", "==", "Siswa"));
+        const q = query(
+          collection(db, "users"), 
+          where("schoolName", "==", userData.schoolName),
+          where("role", "==", "Siswa")
+        );
         const snapshot = await getDocs(q);
         const classes = new Set<string>();
         snapshot.docs.forEach((doc) => {
@@ -133,7 +140,7 @@ export default function GuruDashboard() {
       }
     };
     fetchClasses();
-  }, []);
+  }, [userData?.schoolName]);
 
   const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
   const [deletingQuizId, setDeletingQuizId] = useState<string | null>(null);
@@ -143,8 +150,66 @@ export default function GuruDashboard() {
   const [fullLeaderboard, setFullLeaderboard] = useState<any[]>([]);
   const [isFetchingLeaderboard, setIsFetchingLeaderboard] = useState(false);
   const [mainTab, setMainTab] = useState<
-    "beranda" | "kuis" | "tugas" | "materi" | "analitik"
+    "beranda" | "kuis" | "tugas" | "materi" | "analitik" | "penilaian" | "profil"
   >("beranda");
+
+  // Filters for Rooms
+  const [roomsFilter, setRoomsFilter] = useState<"semua" | "aktif" | "selesai">("semua");
+  const [historyFilter, setHistoryFilter] = useState<"semua" | "aktif" | "selesai">("semua");
+
+  // Date formatter helper
+  const formatDate = (dateObj: any) => {
+    if (!dateObj) return "-";
+    try {
+      const d = dateObj.toDate ? dateObj.toDate() : new Date(dateObj);
+      return d.toLocaleString("id-ID", {
+        day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute:"2-digit"
+      }) + " WIB";
+    } catch(e) {
+      return "-";
+    }
+  };
+
+  // Profil State
+  const [profileData, setProfileData] = useState({
+    displayName: "",
+    avatar: "0",
+    subject: "",
+    schoolName: ""
+  });
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+
+  useEffect(() => {
+    if (userData) {
+      setProfileData({
+        displayName: userData.displayName || "",
+        avatar: userData.avatar || "0",
+        subject: userData.subject || "",
+        schoolName: userData.schoolName || "SMPN 1 Wedi"
+      });
+    }
+  }, [userData]);
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userData?.uid) return;
+    setIsUpdatingProfile(true);
+    try {
+      await updateDoc(doc(db, "users", userData.uid), {
+        displayName: profileData.displayName,
+        avatar: profileData.avatar,
+        subject: profileData.subject,
+        schoolName: profileData.schoolName
+      });
+      alert("Profil berhasil diperbarui!");
+      window.location.reload();
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      alert("Gagal memperbarui profil.");
+    } finally {
+      setIsUpdatingProfile(false);
+    }
+  };
 
   // Analytics State
   const [analyticsData, setAnalyticsData] = useState<{
@@ -160,6 +225,7 @@ export default function GuruDashboard() {
   // Manual Quiz State
   const [isCreatingManualQuiz, setIsCreatingManualQuiz] = useState(false);
   const [manualQuizTitle, setManualQuizTitle] = useState("");
+  const [manualQuizSubjectType, setManualQuizSubjectType] = useState<"mapel" | "lainnya">("mapel");
   const [manualQuizType, setManualQuizType] = useState<
     "multiple_choice" | "true_false" | "duck_hunt" | "hidden_word" | "mixed_1" | "mixed_2"
   >("multiple_choice");
@@ -216,76 +282,89 @@ export default function GuruDashboard() {
     useState(false);
   const [viewingRoomId, setViewingRoomId] = useState<string | null>(null);
 
+  // Penilaian State
+  const [penilaianFilterClass, setPenilaianFilterClass] = useState("Semua Kelas");
+  const [penilaianFilterQuiz, setPenilaianFilterQuiz] = useState("Semua Kuis");
+  const [penilaianData, setPenilaianData] = useState<any[]>([]);
+  const [isFetchingPenilaian, setIsFetchingPenilaian] = useState(false);
+
   const fetchQuizzes = useCallback(async () => {
-    if (!userData?.uid) return;
+    if (!userData?.uid || !userData?.schoolName || !userData?.subject) return;
     try {
       const q = query(
         collection(db, "quizzes"),
-        where("guruId", "==", userData.uid),
+        where("schoolName", "==", userData.schoolName)
       );
       const snapshot = await getDocs(q);
-      setQuizzes(
-        snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Quiz),
-      );
+      const allQuizzes = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Quiz);
+      setQuizzes(allQuizzes.filter(q => q.guruId === userData.uid));
     } catch (error) {
       console.error("Error fetching quizzes:", error);
     }
-  }, [userData?.uid]);
+  }, [userData?.uid, userData?.schoolName, userData?.subject]);
 
   const fetchRooms = useCallback(async () => {
-    if (!userData?.uid) return;
+    if (!userData?.uid || !userData?.schoolName) return;
     try {
       const q = query(
         collection(db, "rooms"),
-        where("guruId", "==", userData.uid),
+        where("schoolName", "==", userData.schoolName)
       );
       const snapshot = await getDocs(q);
       setRooms(
-        snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Room),
+        snapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }) as Room)
+          .filter(room => room.guruId === userData.uid)
       );
     } catch (error) {
       console.error("Error fetching rooms:", error);
     }
-  }, [userData?.uid]);
+  }, [userData?.uid, userData?.schoolName]);
 
   const fetchMaterials = useCallback(async () => {
-    if (!userData?.uid) return;
+    if (!userData?.uid || !userData?.schoolName || !userData?.subject) return;
     try {
       const q = query(
         collection(db, "materials"),
-        where("guruId", "==", userData.uid),
-        orderBy("order", "asc"),
+        where("schoolName", "==", userData.schoolName)
       );
       const snapshot = await getDocs(q);
-      setMaterials(
-        snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Material),
-      );
+      const allMaterials = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Material);
+      const filtered = allMaterials.filter(m => m.subject === userData.subject);
+      filtered.sort((a, b) => (a.order || 0) - (b.order || 0));
+      setMaterials(filtered);
     } catch (error) {
       console.error("Error fetching materials:", error);
     }
-  }, [userData?.uid]);
+  }, [userData?.uid, userData?.schoolName, userData?.subject]);
 
   const fetchAssignments = useCallback(async () => {
-    if (!userData?.uid) return;
+    if (!userData?.uid || !userData?.schoolName || !userData?.subject) return;
     try {
       const q = query(
         collection(db, "assignments"),
-        where("guruId", "==", userData.uid),
-        orderBy("createdAt", "desc"),
+        where("schoolName", "==", userData.schoolName)
       );
       const snapshot = await getDocs(q);
-      setAssignments(
-        snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Assignment),
-      );
+      const allAssignments = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Assignment);
+      const filtered = allAssignments.filter(a => a.subject === userData.subject);
+      filtered.sort((a, b) => {
+        const dateA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+        const dateB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+        return dateB - dateA;
+      });
+      setAssignments(filtered);
     } catch (error) {
       console.error("Error fetching assignments:", error);
     }
-  }, [userData?.uid]);
+  }, [userData?.uid, userData?.schoolName, userData?.subject]);
 
   const fetchTopStudents = useCallback(async () => {
+    if (!userData?.schoolName) return;
     try {
       const q = query(
         collection(db, "users"),
+        where("schoolName", "==", userData.schoolName),
         where("role", "==", "Siswa"),
         orderBy("xp", "desc"),
         limit(5),
@@ -297,7 +376,7 @@ export default function GuruDashboard() {
     } catch (error) {
       console.error("Error fetching top students:", error);
     }
-  }, []);
+  }, [userData?.schoolName]);
 
   const fetchAnalytics = useCallback(async () => {
     if (!userData?.uid || rooms.length === 0) return;
@@ -386,13 +465,89 @@ export default function GuruDashboard() {
       fetchAnalytics();
     }
   }, [mainTab, analyticsData, fetchAnalytics]);
+
+  const fetchPenilaian = useCallback(async () => {
+    if (!userData?.schoolName) return;
+    setIsFetchingPenilaian(true);
+    try {
+      let studentsQuery;
+      if (penilaianFilterClass !== "Semua Kelas") {
+        studentsQuery = query(
+          collection(db, "users"),
+          where("schoolName", "==", userData.schoolName),
+          where("role", "==", "Siswa"),
+          where("studentClass", "==", penilaianFilterClass)
+        );
+      } else {
+        studentsQuery = query(
+          collection(db, "users"),
+          where("schoolName", "==", userData.schoolName),
+          where("role", "==", "Siswa")
+        );
+      }
+      const studentsSnap = await getDocs(studentsQuery);
+      const students = studentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      let roomsToFetch = rooms;
+      if (penilaianFilterQuiz !== "Semua Kuis") {
+        roomsToFetch = rooms.filter(r => r.quizId === penilaianFilterQuiz);
+      }
+
+      const lbPromises = roomsToFetch.map(async (room) => {
+        const lbRef = collection(db, "rooms", room.id, "leaderboard");
+        const snapshot = await getDocs(lbRef);
+        return { room, docs: snapshot.docs };
+      });
+
+      const results = await Promise.all(lbPromises);
+      
+      const studentScores: Record<string, any> = {};
+      students.forEach(s => {
+        studentScores[s.id] = {
+          ...s,
+          scores: {}
+        };
+      });
+
+      results.forEach(({ room, docs }) => {
+        docs.forEach((doc) => {
+          const data = doc.data();
+          if (studentScores[doc.id]) {
+            studentScores[doc.id].scores[room.id] = data.score;
+          }
+        });
+      });
+
+      const finalData = Object.values(studentScores).sort((a: any, b: any) => {
+        if (a.studentClass !== b.studentClass) {
+          return (a.studentClass || "").localeCompare(b.studentClass || "");
+        }
+        return parseInt(a.studentAbsen || "0") - parseInt(b.studentAbsen || "0");
+      });
+
+      setPenilaianData(finalData);
+    } catch (error) {
+      console.error("Error fetching penilaian:", error);
+    } finally {
+      setIsFetchingPenilaian(false);
+    }
+  }, [rooms, penilaianFilterClass, penilaianFilterQuiz, userData?.schoolName]);
+
+  useEffect(() => {
+    if (mainTab === "penilaian") {
+      fetchPenilaian();
+    }
+  }, [mainTab, fetchPenilaian]);
+
   const fetchFullLeaderboard = useCallback(async (classFilter: string) => {
+    if (!userData?.schoolName) return;
     setIsFetchingLeaderboard(true);
     try {
       let q;
       if (classFilter) {
         q = query(
           collection(db, "users"),
+          where("schoolName", "==", userData.schoolName),
           where("role", "==", "Siswa"),
           where("studentClass", "==", classFilter),
           orderBy("xp", "desc"),
@@ -400,6 +555,7 @@ export default function GuruDashboard() {
       } else {
         q = query(
           collection(db, "users"),
+          where("schoolName", "==", userData.schoolName),
           where("role", "==", "Siswa"),
           orderBy("xp", "desc")
         );
@@ -413,7 +569,7 @@ export default function GuruDashboard() {
     } finally {
       setIsFetchingLeaderboard(false);
     }
-  }, []);
+  }, [userData?.schoolName]);
 
   useEffect(() => {
     if (isViewingLeaderboard) {
@@ -570,9 +726,11 @@ export default function GuruDashboard() {
         const generatedData = JSON.parse(response.text || "{}");
 
         if (generatedData.title && generatedData.questions) {
+          const actualSubject = aiQuizSubjectType === "mapel" ? (profileData.subject || userData.subject) : "Umum / Lainnya";
           const quizData: any = {
+            schoolName: userData.schoolName,
             guruId: userData.uid,
-            subject: userData.subject,
+            subject: actualSubject,
             title: generatedData.title,
             quizType: quizType, // Save the mode
             questions: generatedData.questions,
@@ -618,6 +776,7 @@ export default function GuruDashboard() {
     
     const roomCode = Math.floor(100000 + Math.random() * 900000).toString();
     const roomRef = await addDoc(collection(db, "rooms"), {
+      schoolName: userData?.schoolName,
       roomCode,
       quizId,
       quizTitle,
@@ -714,6 +873,7 @@ export default function GuruDashboard() {
       const newMaterial = {
         guruId: userData?.uid,
         subject: userData?.subject,
+        schoolName: userData?.schoolName,
         title: materialTitle,
         description: materialDesc,
         content: materialType === "text" ? materialContent : "",
@@ -785,6 +945,7 @@ export default function GuruDashboard() {
       const newAssignment = {
         guruId: userData?.uid,
         subject: userData?.subject,
+        schoolName: userData?.schoolName,
         title: assignmentTitle,
         description: assignmentDesc,
         content: assignmentContent,
@@ -885,6 +1046,35 @@ export default function GuruDashboard() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 mb-6 flex-1">
+                  <div className="space-y-2 sm:col-span-2">
+                    <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
+                      Kategori Kuis / Mata Pelajaran
+                    </label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer flex-1 bg-brand-cream/30 p-3 rounded-xl border-2 border-transparent hover:border-brand-navy/10 transition-all has-[:checked]:border-brand-navy has-[:checked]:bg-brand-navy/5">
+                        <input
+                          type="radio"
+                          name="aiQuizSubjectType"
+                          value="mapel"
+                          checked={aiQuizSubjectType === "mapel"}
+                          onChange={() => setAiQuizSubjectType("mapel")}
+                          className="w-4 h-4 text-brand-navy accent-brand-navy"
+                        />
+                        <span className="text-sm font-bold text-brand-navy">{profileData.subject || userData?.subject || "Mata Pelajaran Saya"}</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer flex-1 bg-brand-cream/30 p-3 rounded-xl border-2 border-transparent hover:border-brand-orange/10 transition-all has-[:checked]:border-brand-orange has-[:checked]:bg-brand-orange/5">
+                        <input
+                          type="radio"
+                          name="aiQuizSubjectType"
+                          value="lainnya"
+                          checked={aiQuizSubjectType === "lainnya"}
+                          onChange={() => setAiQuizSubjectType("lainnya")}
+                          className="w-4 h-4 text-brand-orange accent-brand-orange"
+                        />
+                        <span className="text-sm font-bold text-brand-navy">Topik Umum / Lainnya</span>
+                      </label>
+                    </div>
+                  </div>
                   <div className="space-y-2 sm:col-span-2">
                     <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
                       Topik Pembelajaran
@@ -1036,6 +1226,11 @@ export default function GuruDashboard() {
                         <h3 className="font-black text-lg md:text-xl text-brand-navy mb-1 group-hover:text-brand-orange transition-colors line-clamp-2">
                           {quiz.title}
                         </h3>
+                        {quiz.subject === "Umum / Lainnya" ? (
+                          <span className="inline-block bg-brand-navy/5 text-brand-navy/60 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest mb-2 border border-brand-navy/10">Lainnya</span>
+                        ) : (
+                          <span className="inline-block bg-brand-orange/10 text-brand-orange px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest mb-2 border border-brand-orange/20">Mapel Anda</span>
+                        )}
                         <p className="text-[10px] text-brand-navy/40 font-black uppercase tracking-widest mb-1">
                           {quiz.questions.length} Pertanyaan •{" "}
                           {quiz.quizType === "true_false"
@@ -1245,17 +1440,26 @@ export default function GuruDashboard() {
         {mainTab === "beranda" && (
           <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
             <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5">
-              <h2 className="text-xl md:text-2xl font-black text-brand-navy mb-6 md:mb-8 flex items-center gap-3 tracking-tight">
-                <History className="w-6 h-6 md:w-7 md:h-7 text-brand-orange" />
-                Ruangan
-              </h2>
-              {rooms.length === 0 ? (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 md:mb-8 gap-4">
+                <h2 className="text-xl md:text-2xl font-black text-brand-navy flex items-center gap-3 tracking-tight">
+                  <History className="w-6 h-6 md:w-7 md:h-7 text-brand-orange" />
+                  Ruangan
+                </h2>
+                <div className="flex bg-brand-cream/50 p-1 rounded-xl">
+                  <button onClick={() => setRoomsFilter("semua")} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${roomsFilter === "semua" ? "bg-white text-brand-navy shadow-sm" : "text-brand-navy/50"}`}>Semua</button>
+                  <button onClick={() => setRoomsFilter("aktif")} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${roomsFilter === "aktif" ? "bg-white text-brand-orange shadow-sm" : "text-brand-navy/50"}`}>Aktif</button>
+                  <button onClick={() => setRoomsFilter("selesai")} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${roomsFilter === "selesai" ? "bg-white text-brand-navy shadow-sm" : "text-brand-navy/50"}`}>Selesai</button>
+                </div>
+              </div>
+              {rooms.filter(room => roomsFilter === "semua" ? true : roomsFilter === "aktif" ? (room.status !== "finished") : room.status === "finished").length === 0 ? (
                 <p className="text-brand-navy/40 text-center py-8 text-sm font-bold">
-                  Belum ada ruangan.
+                  Belum ada ruangan yang sesuai filter.
                 </p>
               ) : (
                 <div className="space-y-4">
-                  {rooms.map((room) => (
+                  {rooms
+                    .filter(room => roomsFilter === "semua" ? true : roomsFilter === "aktif" ? (room.status !== "finished") : room.status === "finished")
+                    .map((room) => (
                     <div
                       key={room.id}
                       className="p-5 bg-brand-cream/50 rounded-3xl border border-transparent hover:border-brand-orange/20 transition-all"
@@ -1276,11 +1480,19 @@ export default function GuruDashboard() {
                           {room.status}
                         </span>
                       </div>
-                      <div className="mb-4 flex items-center gap-2">
-                        <Users className="w-4 h-4 text-brand-navy/40" />
-                        <span className="text-[10px] font-bold text-brand-navy/60 uppercase tracking-widest">
-                          {room.targetClass === "Semua Kelas" || !room.targetClass ? "Semua Kelas" : `Kelas ${room.targetClass}`}
-                        </span>
+                      <div className="mb-4 flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4 text-brand-navy/40" />
+                          <span className="text-[10px] font-bold text-brand-navy/60 uppercase tracking-widest">
+                            {room.targetClass === "Semua Kelas" || !room.targetClass ? "Semua Kelas" : `Kelas ${room.targetClass}`}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <History className="w-4 h-4 text-brand-navy/40" />
+                          <span className="text-[10px] font-bold text-brand-navy/60 uppercase tracking-widest">
+                            Dibuat: {formatDate(room.createdAt)}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex justify-between items-center gap-2">
                         <button
@@ -1299,20 +1511,20 @@ export default function GuruDashboard() {
                             e.stopPropagation();
                             deleteRoom(room.id);
                           }}
-                          className={`p-2 rounded-xl transition-all z-10 ${
+                          className={`px-3 py-2 rounded-xl transition-all z-10 flex items-center justify-center ${
                             deletingRoomId === room.id
-                              ? "bg-red-500 text-white shadow-lg shadow-red-500/20 scale-110"
-                              : "text-brand-navy/20 hover:text-red-500"
+                              ? room.status !== "finished" ? "bg-red-600 text-white shadow-xl shadow-red-600/30 scale-105" : "bg-red-500 text-white shadow-lg shadow-red-500/20 scale-105"
+                              : "text-brand-navy/20 hover:text-red-500 hover:bg-red-50"
                           }`}
                           title={
                             deletingRoomId === room.id
-                              ? "Klik lagi untuk konfirmasi"
+                              ? room.status !== "finished" ? "Kuis Sedang Aktif! Peringatan Keras" : "Klik lagi untuk konfirmasi"
                               : "Hapus Ruangan"
                           }
                         >
                           {deletingRoomId === room.id ? (
-                            <span className="text-[8px] font-black uppercase px-1">
-                              Yakin?
+                            <span className={`text-[9px] font-black uppercase px-2 tracking-widest ${room.status !== "finished" ? "animate-pulse" : ""}`}>
+                              {room.status !== "finished" ? "Aktif! Yakin Hapus?" : "Hapus?"}
                             </span>
                           ) : (
                             <Trash2 className="w-4 h-4" />
@@ -1394,26 +1606,34 @@ export default function GuruDashboard() {
 
             {/* Room History / Quiz Results */}
             <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5">
-              <div className="flex items-center justify-between mb-6 md:mb-8">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 md:mb-8 gap-4">
                 <h2 className="text-xl md:text-2xl font-black text-brand-navy flex items-center gap-3 tracking-tight">
                   <History className="w-6 h-6 md:w-7 md:h-7 text-brand-orange" />
                   Riwayat Ruangan & Hasil Kuis
                 </h2>
-                <span className="bg-brand-cream text-brand-navy/60 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
-                  {rooms.length} Ruangan
-                </span>
+                <div className="flex items-center gap-4 w-full md:w-auto justify-between">
+                  <div className="flex bg-brand-cream/50 p-1 rounded-xl">
+                    <button onClick={() => setHistoryFilter("semua")} className={`px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all ${historyFilter === "semua" ? "bg-white text-brand-navy shadow-sm" : "text-brand-navy/50"}`}>Semua</button>
+                    <button onClick={() => setHistoryFilter("aktif")} className={`px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all ${historyFilter === "aktif" ? "bg-white text-brand-orange shadow-sm" : "text-brand-navy/50"}`}>Aktif</button>
+                    <button onClick={() => setHistoryFilter("selesai")} className={`px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all ${historyFilter === "selesai" ? "bg-white text-brand-navy shadow-sm" : "text-brand-navy/50"}`}>Selesai</button>
+                  </div>
+                  <span className="bg-brand-cream text-brand-navy/60 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest hidden sm:inline-block">
+                    {rooms.filter(room => historyFilter === "semua" ? true : historyFilter === "aktif" ? (room.status !== "finished") : room.status === "finished").length} Ruangan
+                  </span>
+                </div>
               </div>
 
-              {rooms.length === 0 ? (
+              {rooms.filter(room => historyFilter === "semua" ? true : historyFilter === "aktif" ? (room.status !== "finished") : room.status === "finished").length === 0 ? (
                 <div className="text-center py-12 bg-brand-cream/30 rounded-[32px] border-2 border-dashed border-brand-navy/10">
                   <History className="w-10 h-10 text-brand-navy/20 mx-auto mb-4" />
                   <p className="text-brand-navy/40 text-sm font-bold">
-                    Belum ada riwayat kuis.
+                    Belum ada riwayat kuis yang sesuai filter.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                   {[...rooms]
+                    .filter(room => historyFilter === "semua" ? true : historyFilter === "aktif" ? (room.status !== "finished") : room.status === "finished")
                     .sort(
                       (a, b) =>
                         (b.createdAt?.seconds || 0) -
@@ -1432,12 +1652,17 @@ export default function GuruDashboard() {
                               {room.targetClass === "Semua Kelas" || !room.targetClass ? "Semua Kelas" : `Kelas ${room.targetClass}`}
                             </span>
                           </h3>
-                          <div className="flex items-center gap-3">
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
                             <span className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest">
                               Kode: {room.roomCode}
                             </span>
+                            <span className="text-brand-navy/20">•</span>
+                            <span className="text-[10px] font-bold text-brand-navy/40 uppercase tracking-widest">
+                              {formatDate(room.createdAt)}
+                            </span>
+                            <span className="text-brand-navy/20 hidden sm:inline">•</span>
                             <span
-                              className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
+                              className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full mt-1 sm:mt-0 ${
                                 room.status === "finished"
                                   ? "bg-emerald-100 text-emerald-600"
                                   : "bg-brand-orange/10 text-brand-orange"
@@ -1887,6 +2112,181 @@ export default function GuruDashboard() {
             </section>
           </div>
         )}
+
+        {/* Penilaian Tab */}
+        {mainTab === "penilaian" && (
+          <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+            <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                <div>
+                  <h2 className="text-xl md:text-2xl font-black text-brand-navy flex items-center gap-3 tracking-tight">
+                    <BookOpen className="w-6 h-6 md:w-7 md:h-7 text-brand-orange" />
+                    Penilaian Siswa
+                  </h2>
+                  <p className="text-brand-navy/60 text-sm font-medium mt-1">
+                    Lihat nilai siswa berdasarkan kuis dan kelas
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+                  <select
+                    value={penilaianFilterClass}
+                    onChange={(e) => setPenilaianFilterClass(e.target.value)}
+                    className="px-4 py-3 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none text-brand-navy font-bold transition-all"
+                  >
+                    <option value="Semua Kelas">Semua Kelas</option>
+                    {availableClasses.map(cls => (
+                      <option key={cls} value={cls}>Kelas {cls}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={penilaianFilterQuiz}
+                    onChange={(e) => setPenilaianFilterQuiz(e.target.value)}
+                    className="px-4 py-3 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none text-brand-navy font-bold transition-all"
+                  >
+                    <option value="Semua Kuis">Semua Kuis</option>
+                    {quizzes.map(q => (
+                      <option key={q.id} value={q.id}>{q.title}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {isFetchingPenilaian ? (
+                <div className="flex justify-center items-center py-12">
+                  <div className="w-12 h-12 border-4 border-brand-orange border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-brand-navy/10">
+                        <th className="py-4 px-4 font-black text-brand-navy/40 uppercase tracking-widest text-xs">No. Absen</th>
+                        <th className="py-4 px-4 font-black text-brand-navy/40 uppercase tracking-widest text-xs">Nama Siswa</th>
+                        <th className="py-4 px-4 font-black text-brand-navy/40 uppercase tracking-widest text-xs">Kelas</th>
+                        {penilaianFilterQuiz !== "Semua Kuis" ? (
+                          <th className="py-4 px-4 font-black text-brand-navy/40 uppercase tracking-widest text-xs text-right">Nilai</th>
+                        ) : (
+                          <th className="py-4 px-4 font-black text-brand-navy/40 uppercase tracking-widest text-xs text-right">Total XP</th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {penilaianData.map((student, idx) => {
+                        let displayScore = 0;
+                        if (penilaianFilterQuiz !== "Semua Kuis") {
+                          // Find the room for this quiz
+                          const room = rooms.find(r => r.quizId === penilaianFilterQuiz);
+                          if (room && student.scores && student.scores[room.id]) {
+                            displayScore = student.scores[room.id];
+                          }
+                        } else {
+                          displayScore = student.xp || 0;
+                        }
+
+                        return (
+                          <tr key={student.id} className="border-b border-brand-navy/5 hover:bg-brand-cream/20 transition-colors">
+                            <td className="py-4 px-4 font-bold text-brand-navy">{student.studentAbsen || "-"}</td>
+                            <td className="py-4 px-4 font-bold text-brand-navy flex items-center gap-3">
+                              <Avatar avatarString={student.avatar || student.displayName} size="sm" />
+                              {student.displayName}
+                            </td>
+                            <td className="py-4 px-4 font-bold text-brand-navy">{student.studentClass || "-"}</td>
+                            <td className="py-4 px-4 font-black text-brand-orange text-right">{displayScore}</td>
+                          </tr>
+                        );
+                      })}
+                      {penilaianData.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="py-8 text-center text-brand-navy/40 font-medium">
+                            Tidak ada data siswa ditemukan.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        {/* Profil Tab */}
+        {mainTab === "profil" && (
+          <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+            <section className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-brand-navy/5 max-w-2xl mx-auto">
+              <div className="flex items-center gap-4 mb-8">
+                <div className="p-4 bg-brand-navy/5 rounded-2xl">
+                  <Settings className="w-8 h-8 text-brand-navy" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black text-brand-navy tracking-tight">Pengaturan Profil</h2>
+                  <p className="text-brand-navy/60 text-sm font-medium mt-1">
+                    Perbarui informasi akun, foto, dan sekolah Anda
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleUpdateProfile} className="space-y-6">
+                <div>
+                  <label className="block text-sm font-bold text-brand-navy mb-2">Nama Lengkap</label>
+                  <input
+                    type="text"
+                    value={profileData.displayName}
+                    onChange={(e) => setProfileData({ ...profileData, displayName: e.target.value })}
+                    className="w-full px-4 py-3 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none text-brand-navy font-bold transition-all"
+                    placeholder="Contoh: Budi Santoso, S.Pd"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-brand-navy mb-2">Avatar (Seed Code)</label>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 flex-shrink-0">
+                      <Avatar avatarString={profileData.avatar} size="md" />
+                    </div>
+                    <input
+                      type="text"
+                      value={profileData.avatar}
+                      onChange={(e) => setProfileData({ ...profileData, avatar: e.target.value })}
+                      className="flex-1 px-4 py-3 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none text-brand-navy font-bold transition-all"
+                      placeholder="Contoh: guru_math_1"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-brand-navy mb-2">Mata Pelajaran (Diampu)</label>
+                  <input
+                    type="text"
+                    value={profileData.subject}
+                    onChange={(e) => setProfileData({ ...profileData, subject: e.target.value })}
+                    className="w-full px-4 py-3 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none text-brand-navy font-bold transition-all"
+                    placeholder="Contoh: Matematika"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-brand-navy mb-2">Nama Sekolah</label>
+                  <input
+                    type="text"
+                    value={profileData.schoolName}
+                    onChange={(e) => setProfileData({ ...profileData, schoolName: e.target.value })}
+                    className="w-full px-4 py-3 bg-brand-cream/50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none text-brand-navy font-bold transition-all"
+                    placeholder="Contoh: SMPN 1 Wedi"
+                    required
+                  />
+                </div>
+                
+                <button
+                  type="submit"
+                  disabled={isUpdatingProfile}
+                  className="w-full mt-4 bg-brand-orange text-white py-4 px-6 rounded-2xl font-black uppercase tracking-wider bg-brand-orange-shadow hover:translate-y-1 hover:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isUpdatingProfile ? "Menyimpan..." : "Simpan Perubahan"}
+                </button>
+              </form>
+            </section>
+          </div>
+        )}
       </div>
 
       {/* Bottom Navigation - Mobile */}
@@ -1944,6 +2344,28 @@ export default function GuruDashboard() {
           />
           <span className="text-[10px] font-black uppercase tracking-widest">
             Analitik
+          </span>
+        </button>
+        <button
+          onClick={() => setMainTab("penilaian")}
+          className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "penilaian" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}
+        >
+          <Trophy
+            className={`w-6 h-6 ${mainTab === "penilaian" ? "fill-current" : ""}`}
+          />
+          <span className="text-[10px] font-black uppercase tracking-widest">
+            Penilaian
+          </span>
+        </button>
+        <button
+          onClick={() => setMainTab("profil")}
+          className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "profil" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}
+        >
+          <Settings
+            className={`w-6 h-6 ${mainTab === "profil" ? "fill-current" : ""}`}
+          />
+          <span className="text-[10px] font-black uppercase tracking-widest">
+            Profil
           </span>
         </button>
       </nav>
@@ -2023,6 +2445,36 @@ export default function GuruDashboard() {
           />
           <span className="text-xs font-black uppercase tracking-widest">
             Analitik
+          </span>
+        </button>
+        <button
+          onClick={() => setMainTab("penilaian")}
+          className={`flex flex-col items-center gap-2 transition-all px-6 py-3 rounded-2xl ${
+            mainTab === "penilaian"
+              ? "bg-brand-orange/10 text-brand-orange"
+              : "text-brand-navy/40 hover:text-brand-navy/60 hover:bg-brand-navy/5"
+          }`}
+        >
+          <Trophy
+            className={`w-6 h-6 ${mainTab === "penilaian" ? "fill-current" : ""}`}
+          />
+          <span className="text-xs font-black uppercase tracking-widest">
+            Penilaian
+          </span>
+        </button>
+        <button
+          onClick={() => setMainTab("profil")}
+          className={`flex flex-col items-center gap-2 transition-all px-6 py-3 rounded-2xl ${
+            mainTab === "profil"
+              ? "bg-brand-orange/10 text-brand-orange"
+              : "text-brand-navy/40 hover:text-brand-navy/60 hover:bg-brand-navy/5"
+          }`}
+        >
+          <Settings
+            className={`w-6 h-6 ${mainTab === "profil" ? "fill-current" : ""}`}
+          />
+          <span className="text-xs font-black uppercase tracking-widest">
+            Profil
           </span>
         </button>
       </nav>
@@ -2147,6 +2599,35 @@ export default function GuruDashboard() {
               {/* Left Column: Quiz Meta & Question List */}
               <div className="w-full md:w-1/3 flex flex-col gap-6">
                 <div className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
+                      Kategori Kuis / Mata Pelajaran
+                    </label>
+                    <div className="flex flex-col gap-2 mt-1">
+                      <label className="flex items-center gap-2 cursor-pointer bg-brand-cream/30 p-3 rounded-xl border-2 border-transparent hover:border-brand-navy/10 transition-all has-[:checked]:border-brand-navy has-[:checked]:bg-brand-navy/5">
+                        <input
+                          type="radio"
+                          name="manualQuizSubjectType"
+                          value="mapel"
+                          checked={manualQuizSubjectType === "mapel"}
+                          onChange={() => setManualQuizSubjectType("mapel")}
+                          className="w-4 h-4 text-brand-navy accent-brand-navy"
+                        />
+                        <span className="text-sm font-bold text-brand-navy">{profileData.subject || userData?.subject || "Mata Pelajaran Saya"}</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer bg-brand-cream/30 p-3 rounded-xl border-2 border-transparent hover:border-brand-orange/10 transition-all has-[:checked]:border-brand-orange has-[:checked]:bg-brand-orange/5">
+                        <input
+                          type="radio"
+                          name="manualQuizSubjectType"
+                          value="lainnya"
+                          checked={manualQuizSubjectType === "lainnya"}
+                          onChange={() => setManualQuizSubjectType("lainnya")}
+                          className="w-4 h-4 text-brand-orange accent-brand-orange"
+                        />
+                        <span className="text-sm font-bold text-brand-navy">Topik Umum / Lainnya</span>
+                      </label>
+                    </div>
+                  </div>
                   <div>
                     <label className="text-[10px] font-black text-brand-navy/40 uppercase tracking-widest ml-1">
                       Judul Kuis
@@ -2394,9 +2875,11 @@ export default function GuruDashboard() {
                   )
                     return alert("Kata rahasia harus 5-10 huruf");
 
+                  const actualSubject = manualQuizSubjectType === "mapel" ? (profileData.subject || userData.subject) : "Umum / Lainnya";
                   const quizData: any = {
+                    schoolName: userData.schoolName,
                     guruId: userData.uid,
-                    subject: userData.subject,
+                    subject: actualSubject,
                     title: manualQuizTitle,
                     quizType: manualQuizType,
                     questions: manualQuestions,
@@ -2947,6 +3430,14 @@ export default function GuruDashboard() {
         <button onClick={() => setMainTab("analitik")} className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "analitik" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}>
           <BarChart2 className={`w-6 h-6 ${mainTab === "analitik" ? "fill-current" : ""}`} />
           <span className="text-[10px] font-black uppercase tracking-widest">Analitik</span>
+        </button>
+        <button onClick={() => setMainTab("penilaian")} className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "penilaian" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}>
+          <Trophy className={`w-6 h-6 ${mainTab === "penilaian" ? "fill-current" : ""}`} />
+          <span className="text-[10px] font-black uppercase tracking-widest">Penilaian</span>
+        </button>
+        <button onClick={() => setMainTab("profil")} className={`flex flex-col items-center gap-1 transition-colors ${mainTab === "profil" ? "text-brand-orange" : "text-brand-navy/40 hover:text-brand-navy/60"}`}>
+          <Settings className={`w-6 h-6 ${mainTab === "profil" ? "fill-current" : ""}`} />
+          <span className="text-[10px] font-black uppercase tracking-widest">Profil</span>
         </button>
       </nav>
     </div>
